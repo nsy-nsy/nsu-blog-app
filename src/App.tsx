@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BookOpen, CalendarDays, Clock3, Home, List, Menu, Moon, PenLine, Search, Sun, Tag, X } from "lucide-react";
+import { BookOpen, CalendarDays, Clock3, Home, List, LogIn, LogOut, Menu, Moon, PenLine, Search, ShieldCheck, Sun, Tag, X } from "lucide-react";
 import { starterPosts } from "./posts";
 import { cleanText, makeId, safeRead, safeWrite } from "./security";
 import type { Category, Page, Post, PostDraft } from "./types";
@@ -7,6 +7,9 @@ import type { Category, Page, Post, PostDraft } from "./types";
 type Theme = "light" | "dark";
 
 const STORAGE_KEY = "nsu-blog-posts-v5";
+const AUTH_KEY = "nsu-blog-auth-v1";
+const AUTH_HASH_KEY = "nsu-blog-owner-hash-v1";
+const OWNER_ID = "seung";
 const categories: Category[] = ["블로그수익화", "AI글쓰기", "애드센스", "데이터분석", "웹개발", "인프라"];
 
 const emptyDraft: PostDraft = {
@@ -20,6 +23,11 @@ const emptyDraft: PostDraft = {
 function getSystemTheme(): Theme {
   if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getInitialAuth() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(AUTH_KEY) === "owner";
 }
 
 function formatDate(value: string) {
@@ -38,6 +46,14 @@ function parseTags(value: string) {
     .slice(0, 6);
 }
 
+async function hashPasscode(value: string) {
+  const encoded = new TextEncoder().encode(value);
+  const buffer = await window.crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
   const [posts, setPosts] = useState<Post[]>(() => safeRead(STORAGE_KEY, starterPosts));
@@ -49,6 +65,14 @@ export default function App() {
   const [draft, setDraft] = useState<PostDraft>(emptyDraft);
   const [tagInput, setTagInput] = useState("");
   const [message, setMessage] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(() => getInitialAuth());
+  const [loginId, setLoginId] = useState("");
+  const [loginPasscode, setLoginPasscode] = useState("");
+  const [loginMessage, setLoginMessage] = useState("");
+  const [ownerConfigured, setOwnerConfigured] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(window.localStorage.getItem(AUTH_HASH_KEY));
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -68,6 +92,14 @@ export default function App() {
   const featuredPosts = posts.slice(0, 3);
 
   function navigate(nextPage: Page) {
+    if (nextPage === "write" && !isLoggedIn) {
+      setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
+      setPage("login");
+      setMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     setPage(nextPage);
     setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -85,6 +117,12 @@ export default function App() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!isLoggedIn) {
+      setLoginMessage("로그인 후 글을 작성할 수 있습니다.");
+      navigate("login");
+      return;
+    }
 
     const body = cleanText(draft.body, 9000);
     const nextDraft: PostDraft = {
@@ -117,16 +155,64 @@ export default function App() {
   }
 
   function handleDelete(id: string) {
+    if (!isLoggedIn) return;
     const nextPosts = posts.filter((post) => post.id !== id);
     persist(nextPosts);
     setSelectedId(nextPosts[0]?.id ?? "");
+  }
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedId = cleanText(loginId, 24).toLowerCase();
+    const normalizedPasscode = cleanText(loginPasscode, 40);
+
+    if (normalizedId !== OWNER_ID || normalizedPasscode.length < 8) {
+      setLoginMessage("아이디는 seung, 비밀번호는 8자 이상이어야 합니다.");
+      return;
+    }
+
+    const passcodeHash = await hashPasscode(normalizedPasscode);
+    const savedHash = window.localStorage.getItem(AUTH_HASH_KEY);
+
+    if (!savedHash) {
+      window.localStorage.setItem(AUTH_HASH_KEY, passcodeHash);
+      setOwnerConfigured(true);
+      window.sessionStorage.setItem(AUTH_KEY, "owner");
+      setIsLoggedIn(true);
+      setLoginId("");
+      setLoginPasscode("");
+      setLoginMessage("관리자 비밀번호가 설정되었습니다.");
+      navigate("write");
+      return;
+    }
+
+    if (savedHash === passcodeHash) {
+      window.sessionStorage.setItem(AUTH_KEY, "owner");
+      setIsLoggedIn(true);
+      setLoginId("");
+      setLoginPasscode("");
+      setLoginMessage("로그인되었습니다.");
+      navigate("write");
+      return;
+    }
+
+    setLoginMessage("아이디 또는 비밀번호가 맞지 않습니다.");
+  }
+
+  function handleLogout() {
+    window.sessionStorage.removeItem(AUTH_KEY);
+    setIsLoggedIn(false);
+    setMessage("");
+    if (page === "write") navigate("home");
   }
 
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-zinc-950 transition-colors dark:bg-[#050505] dark:text-zinc-50">
       <Header
         menuOpen={menuOpen}
+        isLoggedIn={isLoggedIn}
         onNavigate={navigate}
+        onLogout={handleLogout}
         onToggleMenu={() => setMenuOpen((open) => !open)}
         onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
         page={page}
@@ -145,8 +231,19 @@ export default function App() {
           setQuery={setQuery}
         />
       )}
-      {page === "detail" && <DetailPage onBack={() => navigate("posts")} onDelete={handleDelete} post={selectedPost} />}
-      {page === "write" && (
+      {page === "detail" && <DetailPage isLoggedIn={isLoggedIn} onBack={() => navigate("posts")} onDelete={handleDelete} post={selectedPost} />}
+      {page === "login" && (
+        <LoginPage
+          loginId={loginId}
+          loginMessage={loginMessage}
+          loginPasscode={loginPasscode}
+          ownerConfigured={ownerConfigured}
+          onLogin={handleLogin}
+          setLoginId={setLoginId}
+          setLoginPasscode={setLoginPasscode}
+        />
+      )}
+      {page === "write" && isLoggedIn && (
         <WritePage
           categories={categories}
           draft={draft}
@@ -164,15 +261,19 @@ export default function App() {
 }
 
 function Header({
+  isLoggedIn,
   menuOpen,
   onNavigate,
+  onLogout,
   onToggleMenu,
   onToggleTheme,
   page,
   theme,
 }: {
+  isLoggedIn: boolean;
   menuOpen: boolean;
   onNavigate: (page: Page) => void;
+  onLogout: () => void;
   onToggleMenu: () => void;
   onToggleTheme: () => void;
   page: Page;
@@ -181,45 +282,59 @@ function Header({
   const navItems: Array<{ page: Page; label: string; icon: typeof Home }> = [
     { page: "home", label: "메인페이지", icon: Home },
     { page: "posts", label: "글목록", icon: List },
-    { page: "write", label: "글쓰기", icon: PenLine },
+    { page: isLoggedIn ? "write" : "login", label: "글쓰기", icon: PenLine },
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-[#f7f7f5]/92 px-5 py-3.5 backdrop-blur-xl transition-colors dark:border-zinc-800 dark:bg-[#050505]/88 md:px-8">
-      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-3">
-        <button className="col-span-8 flex items-center gap-3 text-left font-black md:col-span-4" type="button" onClick={() => onNavigate("home")}>
-          <span className="grid size-10 place-items-center rounded-xl bg-zinc-950 text-xs text-white dark:bg-white dark:text-zinc-950">NSU</span>
-          <span className="text-lg tracking-tight">세웅이만의 블로그</span>
+    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/94 px-5 py-4 backdrop-blur-xl transition-colors dark:border-[#24344d] dark:bg-[#1e3553]/96 md:px-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-4">
+        <button className="col-span-8 flex min-w-0 items-center text-left md:col-span-4" type="button" onClick={() => onNavigate("home")}>
+          <span className="min-w-0">
+            <span className="block truncate text-[22px] font-black leading-none text-zinc-950 dark:text-white md:text-2xl">NSU BLOG<span className="text-emerald-500">.</span></span>
+            <span className="mt-1 hidden text-[11px] font-semibold text-zinc-500 dark:text-slate-200 sm:block">세웅이만의 블로그</span>
+          </span>
         </button>
 
-        <nav className="col-span-6 hidden justify-center md:flex" aria-label="주요 메뉴">
-          <div className="inline-flex rounded-2xl border border-zinc-200 bg-white/75 p-1 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/75 dark:shadow-black/20">
+        <div className="col-span-6 hidden items-center justify-end gap-8 md:flex">
+          <nav className="flex items-center gap-7" aria-label="주요 메뉴">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = page === item.page || (page === "detail" && item.page === "posts");
+              const active = page === item.page || (page === "detail" && item.page === "posts") || (page === "login" && item.page === "login");
               return (
                 <button
                   key={item.page}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                  className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${
                     active
-                      ? "bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950"
-                      : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"
+                      ? "text-emerald-600 dark:text-emerald-300"
+                      : "text-zinc-700 hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white"
                   }`}
                   type="button"
                   onClick={() => onNavigate(item.page)}
                 >
-                  <Icon size={14} />
+                  <Icon size={15} />
                   {item.label}
                 </button>
               );
             })}
-          </div>
-        </nav>
+          </nav>
 
-        <div className="col-span-4 flex justify-end gap-2 md:col-span-2">
+          {isLoggedIn ? (
+            <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white" type="button" onClick={onLogout}>
+              <LogOut size={15} />
+              로그아웃
+            </button>
+          ) : (
+            <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
+              <LogIn size={15} />
+              로그인
+            </button>
+          )}
+        </div>
+
+        <div className="col-span-4 flex shrink-0 justify-end gap-2 md:col-span-2">
           <button
             aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
-            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
+            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:border-white/60"
             type="button"
             onClick={onToggleTheme}
           >
@@ -239,7 +354,7 @@ function Header({
         </div>
       </div>
 
-      <div className={`overflow-hidden transition-all duration-300 ease-out md:hidden ${menuOpen ? "max-h-72 translate-y-0 opacity-100" : "max-h-0 -translate-y-2 opacity-0"}`}>
+      <div className={`overflow-hidden transition-all duration-300 ease-out md:hidden ${menuOpen ? "max-h-96 translate-y-0 opacity-100" : "max-h-0 -translate-y-2 opacity-0"}`}>
         <nav className="mx-auto mt-4 grid max-w-7xl gap-2 rounded-xl border border-zinc-200 bg-white p-3 shadow-xl shadow-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/40">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -258,6 +373,17 @@ function Header({
               </button>
             );
           })}
+          {isLoggedIn ? (
+            <button className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-black text-zinc-700 dark:text-zinc-300" type="button" onClick={onLogout}>
+              <LogOut size={18} />
+              로그아웃
+            </button>
+          ) : (
+            <button className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left font-black ${page === "login" ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950" : "text-zinc-700 dark:text-zinc-300"}`} type="button" onClick={() => onNavigate("login")}>
+              <LogIn size={18} />
+              로그인
+            </button>
+          )}
         </nav>
       </div>
     </header>
@@ -270,8 +396,8 @@ function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page: Page) 
       <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-16">
         <div className="col-span-12 flex flex-col justify-center md:col-span-6">
           <p className="mb-3 text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Blog · AI · Revenue</p>
-          <h1 className="text-4xl font-black leading-tight tracking-tight md:text-5xl">세웅이만의 블로그</h1>
-          <p className="mt-5 max-w-2xl text-[15px] leading-7 text-zinc-700 dark:text-zinc-300 md:text-base">
+          <h1 className="text-3xl font-black leading-tight md:text-4xl">세웅이만의 블로그</h1>
+          <p className="mt-5 max-w-2xl text-sm leading-7 text-zinc-700 dark:text-zinc-300 md:text-[15px]">
             AI 도구, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발을 직접 만들며 기록하는 실전 블로그입니다.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
@@ -300,7 +426,7 @@ function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page: Page) 
       <section className="mx-auto grid max-w-7xl grid-cols-12 gap-5 px-5 py-12 md:px-8">
         <div className="col-span-12 mb-2">
           <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Featured</p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">먼저 읽기 좋은 글</h2>
+          <h2 className="mt-2 text-2xl font-black md:text-[28px]">먼저 읽기 좋은 글</h2>
         </div>
         {posts.map((post) => (
           <PostCard key={post.id} className="col-span-12 md:col-span-4" post={post} onOpenPost={onOpenPost} />
@@ -331,7 +457,7 @@ function PostsPage({
     <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-9 md:px-8 md:py-12">
       <div className="col-span-12 md:col-span-3">
         <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Posts</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">글목록</h1>
+        <h1 className="mt-2 text-3xl font-black md:text-4xl">글목록</h1>
       </div>
 
       <div className="col-span-12 space-y-4 md:col-span-9">
@@ -374,7 +500,7 @@ function PostListCard({ post, onOpenPost }: { post: Post; onOpenPost: (id: strin
     <article className="rounded-xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-600 hover:shadow-lg hover:shadow-zinc-200/70 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-500 dark:hover:shadow-black/40 md:p-6">
       <button className="block w-full text-left" type="button" onClick={() => onOpenPost(post.id)}>
         <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-        <h2 className="mt-3 text-lg font-black leading-tight tracking-tight md:text-2xl">{post.title}</h2>
+        <h2 className="mt-3 text-lg font-black leading-tight md:text-2xl">{post.title}</h2>
         <p className="mt-3 line-clamp-2 text-[15px] leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
         <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold text-zinc-500 dark:text-zinc-500">
           <span className="inline-flex items-center gap-1"><CalendarDays size={15} /> {formatDate(post.createdAt)}</span>
@@ -385,7 +511,7 @@ function PostListCard({ post, onOpenPost }: { post: Post; onOpenPost: (id: strin
   );
 }
 
-function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: (id: string) => void; post?: Post }) {
+function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn: boolean; onBack: () => void; onDelete: (id: string) => void; post?: Post }) {
   if (!post) {
     return (
       <section className="mx-auto grid max-w-7xl grid-cols-12 px-5 py-14 md:px-8">
@@ -409,7 +535,7 @@ function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: 
 
       <header className="border-b border-zinc-200 pb-8 dark:border-zinc-800">
         <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-        <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">{post.title}</h1>
+        <h1 className="mt-4 text-3xl font-semibold leading-tight md:text-4xl">{post.title}</h1>
         <p className="mt-4 max-w-3xl text-[15px] leading-7 text-zinc-600 dark:text-zinc-300">{post.excerpt}</p>
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
           <span>
@@ -435,7 +561,7 @@ function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: 
       <footer className="mt-12 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
         <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Search intent</p>
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{post.searchIntent}</p>
-        {isUserPost && (
+        {isLoggedIn && isUserPost && (
           <button
             className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300"
             type="button"
@@ -449,6 +575,75 @@ function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: 
         )}
       </footer>
     </article>
+  );
+}
+
+function LoginPage({
+  loginId,
+  loginMessage,
+  loginPasscode,
+  ownerConfigured,
+  onLogin,
+  setLoginId,
+  setLoginPasscode,
+}: {
+  loginId: string;
+  loginMessage: string;
+  loginPasscode: string;
+  ownerConfigured: boolean;
+  onLogin: (event: FormEvent<HTMLFormElement>) => void;
+  setLoginId: (value: string) => void;
+  setLoginPasscode: (value: string) => void;
+}) {
+  return (
+    <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-16">
+      <div className="col-span-12 flex flex-col justify-center md:col-span-5">
+        <p className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">Owner Access</p>
+        <h1 className="mt-3 text-3xl font-black leading-tight md:text-4xl">로그인 후 글을 작성하세요</h1>
+        <p className="mt-5 max-w-md text-[15px] leading-7 text-zinc-650 dark:text-slate-300">
+          글쓰기는 관리자만 사용할 수 있습니다. 처음 로그인할 때 사용할 비밀번호를 설정하고, 이후에는 같은 비밀번호로 로그인합니다.
+        </p>
+        <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <ShieldCheck size={15} />
+          게시글 작성 보호
+        </div>
+      </div>
+
+      <form className="col-span-12 grid gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/30 md:col-span-7 md:p-6" onSubmit={onLogin}>
+        <label className="grid gap-2 text-sm font-extrabold">
+          아이디
+          <input
+            autoComplete="username"
+            className="rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900"
+            maxLength={24}
+            onChange={(event) => setLoginId(event.target.value)}
+            placeholder="seung"
+            value={loginId}
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-extrabold">
+          비밀번호
+          <input
+            autoComplete="current-password"
+            className="rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900"
+            maxLength={40}
+            onChange={(event) => setLoginPasscode(event.target.value)}
+            placeholder="비밀번호 입력"
+            type="password"
+            value={loginPasscode}
+          />
+        </label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+            {loginMessage || (ownerConfigured ? "설정한 비밀번호로 로그인하세요." : "아이디 seung과 사용할 비밀번호 8자 이상을 입력하면 관리자 비밀번호가 설정됩니다.")}
+          </p>
+          <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200" type="submit">
+            <LogIn size={17} />
+            로그인
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -473,7 +668,7 @@ function WritePage({
     <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-14">
       <div className="col-span-12 md:col-span-4">
         <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Write</p>
-        <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight md:text-4xl">글쓰기</h1>
+        <h1 className="mt-2 text-3xl font-black leading-tight md:text-4xl">글쓰기</h1>
         <p className="mt-5 text-[15px] leading-7 text-zinc-700 dark:text-zinc-300">
           작성한 글은 현재 브라우저에 저장됩니다. 입력값은 길이 제한과 제어문자 제거를 거치고, 본문은 HTML로 실행되지 않습니다.
         </p>
@@ -519,7 +714,7 @@ function PostCard({ className, post, onOpenPost }: { className?: string; post: P
   return (
     <article className={`${className ?? ""} rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950`}>
       <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-      <h3 className="mt-3 text-xl font-black leading-tight tracking-tight">{post.title}</h3>
+      <h3 className="mt-3 text-lg font-black leading-tight md:text-xl">{post.title}</h3>
       <p className="mt-3 text-sm leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
       <button className="mt-5 inline-flex items-center gap-2 text-sm font-black text-zinc-950 dark:text-white" type="button" onClick={() => onOpenPost(post.id)}>
         <BookOpen size={17} />

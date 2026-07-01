@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   --color-zinc-650: #58615c;
   --color-zinc-850: #242424;
 }
@@ -19,7 +19,8 @@ html {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 14px;
+  letter-spacing: 0;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
