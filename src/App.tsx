@@ -286,12 +286,11 @@ function Header({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/94 px-5 py-4 backdrop-blur-xl transition-colors dark:border-[#24344d] dark:bg-[#1e3553]/96 md:px-8">
+    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-[#f7f7f5]/92 px-5 py-4 backdrop-blur-xl transition-colors dark:border-zinc-800 dark:bg-[#050505]/88 md:px-8">
       <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-4">
         <button className="col-span-8 flex min-w-0 items-center text-left md:col-span-4" type="button" onClick={() => onNavigate("home")}>
           <span className="min-w-0">
             <span className="block truncate text-[22px] font-black leading-none text-zinc-950 dark:text-white md:text-2xl">NSU BLOG<span className="text-emerald-500">.</span></span>
-            <span className="mt-1 hidden text-[11px] font-semibold text-zinc-500 dark:text-slate-200 sm:block">세웅이만의 블로그</span>
           </span>
         </button>
 
@@ -306,7 +305,7 @@ function Header({
                   className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${
                     active
                       ? "text-emerald-600 dark:text-emerald-300"
-                      : "text-zinc-700 hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white"
+                      : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
                   }`}
                   type="button"
                   onClick={() => onNavigate(item.page)}
@@ -319,12 +318,12 @@ function Header({
           </nav>
 
           {isLoggedIn ? (
-            <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white" type="button" onClick={onLogout}>
+            <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white" type="button" onClick={onLogout}>
               <LogOut size={15} />
               로그아웃
             </button>
           ) : (
-            <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-slate-100 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
+            <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
               <LogIn size={15} />
               로그인
             </button>
@@ -334,7 +333,7 @@ function Header({
         <div className="col-span-4 flex shrink-0 justify-end gap-2 md:col-span-2">
           <button
             aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
-            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:border-white/60"
+            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
             type="button"
             onClick={onToggleTheme}
           >
