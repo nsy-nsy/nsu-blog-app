@@ -255,7 +255,7 @@ export default function App() {
         />
       )}
 
-      <Footer onNavigate={navigate} />
+      <Footer />
     </main>
   );
 }
@@ -294,8 +294,8 @@ function Header({
           </span>
         </button>
 
-        <div className="flex shrink-0 items-center justify-end gap-3">
-          <div className="hidden items-center gap-6 rounded-2xl border border-zinc-200/80 bg-white/70 px-4 py-2 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/70 dark:shadow-black/20 md:flex">
+        <div className="flex shrink-0 items-center justify-end gap-2">
+          <div className="hidden items-center gap-5 rounded-2xl border border-zinc-200/80 bg-white/70 px-4 py-2 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/70 dark:shadow-black/20 md:flex">
             <nav className="flex items-center gap-5" aria-label="주요 메뉴">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -331,11 +331,23 @@ function Header({
                 로그인
               </button>
             )}
+
+            <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
+
+            <button
+              aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
+              className="relative grid size-8 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-950 transition hover:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:hover:border-zinc-500"
+              type="button"
+              onClick={onToggleTheme}
+            >
+              <Sun className={`absolute transition duration-300 ${theme === "dark" ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"}`} size={17} />
+              <Moon className={`absolute transition duration-300 ${theme === "dark" ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"}`} size={17} />
+            </button>
           </div>
 
           <button
             aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
-            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
+            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400 md:hidden"
             type="button"
             onClick={onToggleTheme}
           >
@@ -734,11 +746,11 @@ function Stat({ className, label, value }: { className?: string; label: string; 
   );
 }
 
-function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
+function Footer() {
   return (
     <footer className="border-t border-zinc-200 bg-zinc-950 px-5 py-10 text-white dark:border-zinc-800 dark:bg-black md:px-8">
       <div className="mx-auto grid max-w-7xl grid-cols-12 gap-6">
-        <div className="col-span-12 md:col-span-6">
+        <div className="col-span-12">
           <div className="flex items-center gap-3 font-black">
             <span className="grid size-10 place-items-center rounded-xl bg-white text-sm text-zinc-950">NSU</span>
             <span>세웅이만의 블로그</span>
@@ -746,13 +758,6 @@ function Footer({ onNavigate }: { onNavigate: (page: Page) => void }) {
           <p className="mt-4 max-w-xl leading-7 text-zinc-300">
             AI와 웹개발을 직접 실험하며 블로그 수익화까지 기록하는 개인 블로그입니다.
           </p>
-        </div>
-        <div className="col-span-12 flex flex-wrap gap-2 md:col-span-6 md:justify-end">
-          {(["home", "posts", "write"] as Page[]).map((target) => (
-            <button key={target} className="rounded-xl border border-zinc-700 px-4 py-2 font-bold text-zinc-200" type="button" onClick={() => onNavigate(target)}>
-              {target === "home" ? "메인페이지" : target === "posts" ? "글목록" : "글쓰기"}
-            </button>
-          ))}
         </div>
       </div>
     </footer>
