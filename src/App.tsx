@@ -185,39 +185,41 @@ function Header({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-[#f7f7f5]/92 px-5 py-5 backdrop-blur-xl transition-colors dark:border-zinc-800 dark:bg-[#050505]/88 md:px-8 md:py-6">
-      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-4">
-        <button className="col-span-8 flex items-center gap-4 text-left font-black md:col-span-4" type="button" onClick={() => onNavigate("home")}>
-          <span className="grid size-12 place-items-center rounded-xl bg-zinc-950 text-sm text-white dark:bg-white dark:text-zinc-950 md:size-14">NSU</span>
-          <span className="text-xl tracking-tight md:text-2xl">세웅이만의 블로그</span>
+    <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-[#f7f7f5]/92 px-5 py-3.5 backdrop-blur-xl transition-colors dark:border-zinc-800 dark:bg-[#050505]/88 md:px-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-3">
+        <button className="col-span-8 flex items-center gap-3 text-left font-black md:col-span-4" type="button" onClick={() => onNavigate("home")}>
+          <span className="grid size-10 place-items-center rounded-xl bg-zinc-950 text-xs text-white dark:bg-white dark:text-zinc-950">NSU</span>
+          <span className="text-lg tracking-tight">세웅이만의 블로그</span>
         </button>
 
-        <nav className="col-span-6 hidden justify-center gap-2 md:flex" aria-label="주요 메뉴">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = page === item.page || (page === "detail" && item.page === "posts");
-            return (
-              <button
-                key={item.page}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-black transition ${
-                  active
-                    ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
-                    : "text-zinc-600 hover:bg-white hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"
-                }`}
-                type="button"
-                onClick={() => onNavigate(item.page)}
-              >
-                <Icon size={16} />
-                {item.label}
-              </button>
-            );
-          })}
+        <nav className="col-span-6 hidden justify-center md:flex" aria-label="주요 메뉴">
+          <div className="inline-flex rounded-2xl border border-zinc-200 bg-white/75 p-1 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/75 dark:shadow-black/20">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = page === item.page || (page === "detail" && item.page === "posts");
+              return (
+                <button
+                  key={item.page}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                    active
+                      ? "bg-zinc-950 text-white shadow-sm dark:bg-white dark:text-zinc-950"
+                      : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-white"
+                  }`}
+                  type="button"
+                  onClick={() => onNavigate(item.page)}
+                >
+                  <Icon size={14} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
         <div className="col-span-4 flex justify-end gap-2 md:col-span-2">
           <button
             aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
-            className="relative grid size-11 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
+            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
             type="button"
             onClick={onToggleTheme}
           >
@@ -227,7 +229,7 @@ function Header({
           <button
             aria-expanded={menuOpen}
             aria-label="모바일 메뉴 열기"
-            className="relative grid size-11 place-items-center rounded-xl border border-zinc-300 bg-white transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:border-zinc-400 md:hidden"
+            className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:border-zinc-400 md:hidden"
             type="button"
             onClick={onToggleMenu}
           >
@@ -265,24 +267,24 @@ function Header({
 function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page: Page) => void; onOpenPost: (id: string) => void; posts: Post[] }) {
   return (
     <>
-      <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-12 md:px-8 md:py-20">
+      <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-16">
         <div className="col-span-12 flex flex-col justify-center md:col-span-6">
-          <p className="mb-3 text-sm font-black uppercase text-emerald-700 dark:text-emerald-400">Blog · AI · Revenue</p>
-          <h1 className="text-5xl font-black leading-tight tracking-tight md:text-7xl">세웅이만의 블로그</h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-zinc-700 dark:text-zinc-300">
+          <p className="mb-3 text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Blog · AI · Revenue</p>
+          <h1 className="text-4xl font-black leading-tight tracking-tight md:text-5xl">세웅이만의 블로그</h1>
+          <p className="mt-5 max-w-2xl text-[15px] leading-7 text-zinc-700 dark:text-zinc-300 md:text-base">
             AI 도구, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발을 직접 만들며 기록하는 실전 블로그입니다.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white dark:bg-white dark:text-zinc-950" type="button" onClick={() => onNavigate("posts")}>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <button className="rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-bold text-white dark:bg-white dark:text-zinc-950" type="button" onClick={() => onNavigate("posts")}>
               글목록 보기
             </button>
-            <button className="rounded-xl border border-zinc-300 bg-white px-5 py-3 font-black dark:border-zinc-700 dark:bg-zinc-950" type="button" onClick={() => onNavigate("write")}>
+            <button className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-bold dark:border-zinc-700 dark:bg-zinc-950" type="button" onClick={() => onNavigate("write")}>
               글쓰기
             </button>
           </div>
         </div>
         <div className="col-span-12 md:col-span-6">
-          <img className="h-full min-h-72 w-full rounded-xl object-cover shadow-2xl shadow-zinc-200 dark:shadow-black/50" src="/blog-hero.png" alt="블로그 콘텐츠 운영 화면과 분석 자료가 놓인 작업 공간" />
+          <img className="h-full min-h-64 w-full rounded-xl object-cover shadow-2xl shadow-zinc-200 dark:shadow-black/50" src="/blog-hero.png" alt="블로그 콘텐츠 운영 화면과 분석 자료가 놓인 작업 공간" />
         </div>
       </section>
 
@@ -295,10 +297,10 @@ function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page: Page) 
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl grid-cols-12 gap-5 px-5 py-14 md:px-8">
+      <section className="mx-auto grid max-w-7xl grid-cols-12 gap-5 px-5 py-12 md:px-8">
         <div className="col-span-12 mb-2">
-          <p className="text-sm font-black uppercase text-emerald-700 dark:text-emerald-400">Featured</p>
-          <h2 className="mt-2 text-4xl font-black tracking-tight">먼저 읽기 좋은 글</h2>
+          <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Featured</p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight md:text-3xl">먼저 읽기 좋은 글</h2>
         </div>
         {posts.map((post) => (
           <PostCard key={post.id} className="col-span-12 md:col-span-4" post={post} onOpenPost={onOpenPost} />
@@ -326,10 +328,10 @@ function PostsPage({
   setQuery: (query: string) => void;
 }) {
   return (
-    <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-14">
+    <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-9 md:px-8 md:py-12">
       <div className="col-span-12 md:col-span-3">
-        <p className="text-sm font-black uppercase text-emerald-700 dark:text-emerald-400">Posts</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight md:text-6xl">글목록</h1>
+        <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Posts</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">글목록</h1>
       </div>
 
       <div className="col-span-12 space-y-4 md:col-span-9">
@@ -342,7 +344,7 @@ function PostsPage({
           {(["전체", ...categories] as const).map((category) => (
             <button
               key={category}
-              className={`rounded-full border px-4 py-2 text-sm font-black transition ${
+              className={`rounded-full border px-3.5 py-2 text-[13px] font-bold transition ${
                 activeCategory === category
                   ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
                   : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300"
@@ -369,12 +371,12 @@ function PostsPage({
 
 function PostListCard({ post, onOpenPost }: { post: Post; onOpenPost: (id: string) => void }) {
   return (
-    <article className="rounded-xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-600 hover:shadow-lg hover:shadow-zinc-200/70 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-500 dark:hover:shadow-black/40 md:p-7">
+    <article className="rounded-xl border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-600 hover:shadow-lg hover:shadow-zinc-200/70 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-emerald-500 dark:hover:shadow-black/40 md:p-6">
       <button className="block w-full text-left" type="button" onClick={() => onOpenPost(post.id)}>
-        <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-        <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight md:text-3xl">{post.title}</h2>
-        <p className="mt-3 line-clamp-2 leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
-        <div className="mt-5 flex flex-wrap gap-3 text-sm font-bold text-zinc-500 dark:text-zinc-500">
+        <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
+        <h2 className="mt-3 text-lg font-black leading-tight tracking-tight md:text-2xl">{post.title}</h2>
+        <p className="mt-3 line-clamp-2 text-[15px] leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
+        <div className="mt-5 flex flex-wrap gap-3 text-xs font-bold text-zinc-500 dark:text-zinc-500">
           <span className="inline-flex items-center gap-1"><CalendarDays size={15} /> {formatDate(post.createdAt)}</span>
           <span className="inline-flex items-center gap-1"><Clock3 size={15} /> {post.readMinutes}분</span>
         </div>
@@ -400,16 +402,16 @@ function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: 
   const isUserPost = !post.id.includes("-");
 
   return (
-    <article className="mx-auto max-w-4xl px-5 py-12 md:px-8 md:py-20">
-      <button className="mb-10 rounded-full border border-zinc-300 bg-white px-5 py-3 font-black text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100" type="button" onClick={onBack}>
+    <article className="mx-auto max-w-3xl px-5 py-10 md:px-8 md:py-16">
+      <button className="mb-8 rounded-full border border-zinc-300 bg-white px-4 py-2.5 text-sm font-bold text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100" type="button" onClick={onBack}>
         ← 글목록
       </button>
 
-      <header className="border-b border-zinc-200 pb-10 dark:border-zinc-800">
-        <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-        <h1 className="mt-5 text-4xl font-semibold leading-tight tracking-tight md:text-6xl">{post.title}</h1>
-        <p className="mt-4 max-w-3xl text-lg leading-8 text-zinc-600 dark:text-zinc-300">{post.excerpt}</p>
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
+      <header className="border-b border-zinc-200 pb-8 dark:border-zinc-800">
+        <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
+        <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">{post.title}</h1>
+        <p className="mt-4 max-w-3xl text-[15px] leading-7 text-zinc-600 dark:text-zinc-300">{post.excerpt}</p>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
           <span>
             <em className="font-serif italic">by</em> <strong className="text-zinc-800 dark:text-zinc-200">세웅</strong>
           </span>
@@ -428,9 +430,9 @@ function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: 
         ))}
       </div>
 
-      <div className="mt-12 whitespace-pre-wrap text-[18px] leading-10 text-zinc-850 dark:text-zinc-100 md:text-[19px]">{post.body}</div>
+      <div className="mt-10 whitespace-pre-wrap text-[15.5px] leading-8 text-zinc-850 dark:text-zinc-100 md:text-base">{post.body}</div>
 
-      <footer className="mt-14 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
+      <footer className="mt-12 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
         <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Search intent</p>
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{post.searchIntent}</p>
         {isUserPost && (
@@ -470,9 +472,9 @@ function WritePage({
   return (
     <section className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-14">
       <div className="col-span-12 md:col-span-4">
-        <p className="text-sm font-black uppercase text-emerald-700 dark:text-emerald-400">Write</p>
-        <h1 className="mt-2 text-4xl font-black leading-tight tracking-tight md:text-6xl">글쓰기</h1>
-        <p className="mt-5 leading-8 text-zinc-700 dark:text-zinc-300">
+        <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Write</p>
+        <h1 className="mt-2 text-3xl font-black leading-tight tracking-tight md:text-4xl">글쓰기</h1>
+        <p className="mt-5 text-[15px] leading-7 text-zinc-700 dark:text-zinc-300">
           작성한 글은 현재 브라우저에 저장됩니다. 입력값은 길이 제한과 제어문자 제거를 거치고, 본문은 HTML로 실행되지 않습니다.
         </p>
       </div>
@@ -516,10 +518,10 @@ function FormInput({ label, maxLength, onChange, placeholder, value }: { label: 
 function PostCard({ className, post, onOpenPost }: { className?: string; post: Post; onOpenPost: (id: string) => void }) {
   return (
     <article className={`${className ?? ""} rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950`}>
-      <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
-      <h3 className="mt-3 text-2xl font-black leading-tight tracking-tight">{post.title}</h3>
-      <p className="mt-3 leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
-      <button className="mt-5 inline-flex items-center gap-2 font-black text-zinc-950 dark:text-white" type="button" onClick={() => onOpenPost(post.id)}>
+      <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
+      <h3 className="mt-3 text-xl font-black leading-tight tracking-tight">{post.title}</h3>
+      <p className="mt-3 text-sm leading-7 text-zinc-700 dark:text-zinc-300">{post.excerpt}</p>
+      <button className="mt-5 inline-flex items-center gap-2 text-sm font-black text-zinc-950 dark:text-white" type="button" onClick={() => onOpenPost(post.id)}>
         <BookOpen size={17} />
         읽기
       </button>
@@ -530,8 +532,8 @@ function PostCard({ className, post, onOpenPost }: { className?: string; post: P
 function Stat({ className, label, value }: { className?: string; label: string; value: string }) {
   return (
     <div className={`${className ?? ""} p-6`}>
-      <strong className="block text-3xl font-black">{value}</strong>
-      <span className="text-sm font-bold text-zinc-600 dark:text-zinc-400">{label}</span>
+      <strong className="block text-2xl font-black">{value}</strong>
+      <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{label}</span>
     </div>
   );
 }
