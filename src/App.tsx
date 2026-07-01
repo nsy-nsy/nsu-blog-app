@@ -63,7 +63,7 @@ export default function App() {
 
   function openPost(id: string) {
     setSelectedId(id);
-    navigate("posts");
+    navigate("detail");
   }
 
   function persist(nextPosts: Post[]) {
@@ -101,7 +101,7 @@ export default function App() {
     setTagInput("");
     setSelectedId(post.id);
     setMessage("글이 저장되었습니다. 글목록에서 바로 확인할 수 있습니다.");
-    navigate("posts");
+    navigate("detail");
   }
 
   function handleDelete(id: string) {
@@ -121,11 +121,16 @@ export default function App() {
           categories={categories}
           filteredPosts={filteredPosts}
           onCategoryChange={setActiveCategory}
-          onDelete={handleDelete}
           onOpenPost={openPost}
           query={query}
-          selectedPost={selectedPost}
           setQuery={setQuery}
+        />
+      )}
+      {page === "detail" && (
+        <DetailPage
+          onBack={() => navigate("posts")}
+          onDelete={handleDelete}
+          post={selectedPost}
         />
       )}
       {page === "write" && (
@@ -163,11 +168,11 @@ function Header({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#f7faf7]/92 px-5 py-4 backdrop-blur md:px-8">
+    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#f7faf7]/92 px-5 py-5 backdrop-blur md:px-8 md:py-6">
       <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-4">
-        <button className="col-span-8 flex items-center gap-3 text-left font-black md:col-span-4" type="button" onClick={() => onNavigate("home")}>
-          <span className="grid size-11 place-items-center rounded-lg bg-zinc-950 text-sm text-white">NSU</span>
-          <span className="text-lg">세웅이만의 블로그</span>
+        <button className="col-span-8 flex items-center gap-4 text-left font-black md:col-span-4" type="button" onClick={() => onNavigate("home")}>
+          <span className="grid size-12 place-items-center rounded-lg bg-zinc-950 text-sm text-white md:size-14">NSU</span>
+          <span className="text-xl md:text-2xl">세웅이만의 블로그</span>
         </button>
 
         <nav className="col-span-8 hidden justify-center gap-2 md:flex" aria-label="주요 메뉴">
@@ -177,7 +182,7 @@ function Header({
               <button
                 key={item.page}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-black transition ${
-                  page === item.page ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
+                  page === item.page || (page === "detail" && item.page === "posts") ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
                 }`}
                 type="button"
                 onClick={() => onNavigate(item.page)}
@@ -215,7 +220,7 @@ function Header({
               <button
                 key={item.page}
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 text-left font-black ${
-                  page === item.page ? "bg-zinc-950 text-white" : "text-zinc-700"
+                  page === item.page || (page === "detail" && item.page === "posts") ? "bg-zinc-950 text-white" : "text-zinc-700"
                 }`}
                 type="button"
                 onClick={() => onNavigate(item.page)}
@@ -286,20 +291,16 @@ function PostsPage({
   categories,
   filteredPosts,
   onCategoryChange,
-  onDelete,
   onOpenPost,
   query,
-  selectedPost,
   setQuery,
 }: {
   activeCategory: Category | "전체";
   categories: Category[];
   filteredPosts: Post[];
   onCategoryChange: (category: Category | "전체") => void;
-  onDelete: (id: string) => void;
   onOpenPost: (id: string) => void;
   query: string;
-  selectedPost?: Post;
   setQuery: (query: string) => void;
 }) {
   return (
@@ -309,7 +310,7 @@ function PostsPage({
         <h1 className="mt-2 text-4xl font-black md:text-6xl">글목록</h1>
       </div>
 
-      <aside className="col-span-12 space-y-4 md:col-span-4">
+      <aside className="col-span-12 space-y-4 md:col-span-3">
         <label className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
           <Search size={18} className="text-zinc-500" />
           <input
@@ -338,61 +339,98 @@ function PostsPage({
           </div>
         </div>
 
-        <div className="grid gap-3">
-          {filteredPosts.map((post) => (
-            <button
-              key={post.id}
-              type="button"
-              onClick={() => onOpenPost(post.id)}
-              className={`rounded-lg border p-4 text-left transition ${
-                selectedPost?.id === post.id ? "border-emerald-700 bg-emerald-50" : "border-zinc-200 bg-white hover:border-zinc-400"
-              }`}
-            >
-              <span className="text-xs font-black text-emerald-700">{post.category}</span>
-              <strong className="mt-2 block leading-snug">{post.title}</strong>
-              <span className="mt-2 block text-sm text-zinc-600">{post.readMinutes}분 읽기</span>
-            </button>
-          ))}
-        </div>
       </aside>
 
-      <article className="col-span-12 rounded-lg border border-zinc-200 bg-white p-6 md:col-span-8 md:p-8">
-        {selectedPost ? (
-          <>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-black text-emerald-700">{selectedPost.category}</p>
-                <h2 className="mt-2 text-3xl font-black leading-tight md:text-5xl">{selectedPost.title}</h2>
-                <div className="mt-4 flex flex-wrap gap-4 text-sm font-bold text-zinc-500">
-                  <span className="inline-flex items-center gap-1"><CalendarDays size={16} /> {formatDate(selectedPost.createdAt)}</span>
-                  <span className="inline-flex items-center gap-1"><Clock3 size={16} /> {selectedPost.readMinutes}분</span>
+      <div className="col-span-12 grid gap-4 md:col-span-9 md:grid-cols-2">
+        {filteredPosts.length > 0 ? (
+          filteredPosts.map((post) => (
+            <article key={post.id} className="rounded-lg border border-zinc-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-emerald-600 hover:shadow-lg hover:shadow-zinc-200/70">
+              <button className="block h-full w-full text-left" type="button" onClick={() => onOpenPost(post.id)}>
+                <span className="text-sm font-black text-emerald-700">{post.category}</span>
+                <h2 className="mt-3 text-2xl font-black leading-tight">{post.title}</h2>
+                <p className="mt-3 leading-7 text-zinc-700">{post.excerpt}</p>
+                <div className="mt-5 flex flex-wrap gap-3 text-sm font-bold text-zinc-500">
+                  <span className="inline-flex items-center gap-1"><CalendarDays size={15} /> {formatDate(post.createdAt)}</span>
+                  <span className="inline-flex items-center gap-1"><Clock3 size={15} /> {post.readMinutes}분</span>
                 </div>
-              </div>
-              {!selectedPost.id.includes("-") && (
-                <button
-                  type="button"
-                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700"
-                  onClick={() => onDelete(selectedPost.id)}
-                >
-                  삭제
-                </button>
-              )}
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              {selectedPost.tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-700">
-                  <Tag size={12} /> {tag}
-                </span>
-              ))}
-            </div>
-            <p className="mt-8 border-l-4 border-emerald-600 pl-4 text-lg font-bold text-zinc-700">{selectedPost.excerpt}</p>
-            <div className="mt-8 whitespace-pre-wrap text-lg leading-9 text-zinc-800">{selectedPost.body}</div>
-          </>
+              </button>
+            </article>
+          ))
         ) : (
-          <p className="text-zinc-600">검색 결과가 없습니다.</p>
+          <div className="rounded-lg border border-zinc-200 bg-white p-8 text-zinc-600 md:col-span-2">검색 결과가 없습니다.</div>
         )}
-      </article>
+      </div>
     </section>
+  );
+}
+
+function DetailPage({ onBack, onDelete, post }: { onBack: () => void; onDelete: (id: string) => void; post?: Post }) {
+  if (!post) {
+    return (
+      <section className="mx-auto grid max-w-7xl grid-cols-12 px-5 py-14 md:px-8">
+        <div className="col-span-12 rounded-lg border border-zinc-200 bg-white p-8">
+          <p className="text-zinc-600">선택된 글이 없습니다.</p>
+          <button className="mt-5 rounded-lg bg-zinc-950 px-5 py-3 font-black text-white" type="button" onClick={onBack}>
+            글목록으로
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const isUserPost = !post.id.includes("-");
+
+  return (
+    <article className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-5 py-10 md:px-8 md:py-14">
+      <div className="col-span-12 md:col-span-2">
+        <button className="rounded-lg border border-zinc-300 bg-white px-4 py-3 font-black text-zinc-800" type="button" onClick={onBack}>
+          ← 글목록
+        </button>
+      </div>
+
+      <div className="col-span-12 rounded-lg border border-zinc-200 bg-white p-6 md:col-span-8 md:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-black text-emerald-700">{post.category}</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight md:text-6xl">{post.title}</h1>
+            <div className="mt-5 flex flex-wrap gap-4 text-sm font-bold text-zinc-500">
+              <span className="inline-flex items-center gap-1"><CalendarDays size={16} /> {formatDate(post.createdAt)}</span>
+              <span className="inline-flex items-center gap-1"><Clock3 size={16} /> {post.readMinutes}분</span>
+            </div>
+          </div>
+          {isUserPost && (
+            <button
+              type="button"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700"
+              onClick={() => {
+                onDelete(post.id);
+                onBack();
+              }}
+            >
+              삭제
+            </button>
+          )}
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {post.tags.map((tag) => (
+            <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-xs font-bold text-zinc-700">
+              <Tag size={12} /> {tag}
+            </span>
+          ))}
+        </div>
+
+        <p className="mt-8 border-l-4 border-emerald-600 pl-4 text-xl font-bold leading-9 text-zinc-700">{post.excerpt}</p>
+        <div className="mt-10 whitespace-pre-wrap text-lg leading-10 text-zinc-800">{post.body}</div>
+      </div>
+
+      <aside className="col-span-12 md:col-span-2">
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <p className="text-xs font-black uppercase text-emerald-700">Search intent</p>
+          <p className="mt-3 text-sm leading-6 text-zinc-700">{post.searchIntent}</p>
+        </div>
+      </aside>
+    </article>
   );
 }
 

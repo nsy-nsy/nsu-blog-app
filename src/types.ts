@@ -14,4 +14,4 @@ export type Post = {
 
 export type PostDraft = Pick<Post, "title" | "category" | "excerpt" | "body" | "tags">;
 
-export type Page = "home" | "posts" | "write";
+export type Page = "home" | "posts" | "detail" | "write";

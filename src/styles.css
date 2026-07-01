@@ -31,3 +31,17 @@ textarea,
 select {
   outline-offset: 3px;
 }
+
+button,
+a,
+label,
+select,
+summary,
+[role="button"] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
