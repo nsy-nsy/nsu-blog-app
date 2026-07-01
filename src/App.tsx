@@ -287,50 +287,52 @@ function Header({
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-[#f7f7f5]/92 px-5 py-4 backdrop-blur-xl transition-colors dark:border-zinc-800 dark:bg-[#050505]/88 md:px-8">
-      <div className="mx-auto grid max-w-7xl grid-cols-12 items-center gap-4">
-        <button className="col-span-8 flex min-w-0 items-center text-left md:col-span-4" type="button" onClick={() => onNavigate("home")}>
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
+        <button className="flex min-w-0 items-center text-left" type="button" onClick={() => onNavigate("home")}>
           <span className="min-w-0">
             <span className="block truncate text-[22px] font-black leading-none text-zinc-950 dark:text-white md:text-2xl">NSU BLOG<span className="text-emerald-500">.</span></span>
           </span>
         </button>
 
-        <div className="col-span-6 hidden items-center justify-end gap-8 md:flex">
-          <nav className="flex items-center gap-7" aria-label="주요 메뉴">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = page === item.page || (page === "detail" && item.page === "posts") || (page === "login" && item.page === "login");
-              return (
-                <button
-                  key={item.page}
-                  className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${
-                    active
-                      ? "text-emerald-600 dark:text-emerald-300"
-                      : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                  }`}
-                  type="button"
-                  onClick={() => onNavigate(item.page)}
-                >
-                  <Icon size={15} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
+        <div className="flex shrink-0 items-center justify-end gap-3">
+          <div className="hidden items-center gap-6 rounded-2xl border border-zinc-200/80 bg-white/70 px-4 py-2 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/70 dark:shadow-black/20 md:flex">
+            <nav className="flex items-center gap-5" aria-label="주요 메뉴">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = page === item.page || (page === "detail" && item.page === "posts") || (page === "login" && item.page === "login");
+                return (
+                  <button
+                    key={item.page}
+                    className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${
+                      active
+                        ? "text-emerald-600 dark:text-emerald-300"
+                        : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                    }`}
+                    type="button"
+                    onClick={() => onNavigate(item.page)}
+                  >
+                    <Icon size={15} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </nav>
 
-          {isLoggedIn ? (
-            <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white" type="button" onClick={onLogout}>
-              <LogOut size={15} />
-              로그아웃
-            </button>
-          ) : (
-            <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
-              <LogIn size={15} />
-              로그인
-            </button>
-          )}
-        </div>
+            <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
 
-        <div className="col-span-4 flex shrink-0 justify-end gap-2 md:col-span-2">
+            {isLoggedIn ? (
+              <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white" type="button" onClick={onLogout}>
+                <LogOut size={15} />
+                로그아웃
+              </button>
+            ) : (
+              <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
+                <LogIn size={15} />
+                로그인
+              </button>
+            )}
+          </div>
+
           <button
             aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
             className="relative grid size-10 place-items-center rounded-xl border border-zinc-300 bg-white text-zinc-950 transition hover:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-white dark:hover:border-zinc-400"
