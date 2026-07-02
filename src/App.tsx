@@ -8,6 +8,8 @@ import type { Category, Page, Post, PostDraft } from "./types";
 type Theme = "light" | "dark";
 
 const STORAGE_KEY = "nsu-blog-posts-v5";
+const SITE_URL = (import.meta.env.VITE_SITE_URL ?? "https://nsy-nsy.github.io/nsu-blog-app").replace(/\/$/, "");
+const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, "");
 const categories: Category[] = ["블로그수익화", "AI글쓰기", "애드센스", "데이터분석", "웹개발", "인프라"];
 
 const emptyDraft: PostDraft = {
@@ -39,14 +41,57 @@ function parseTags(value: string) {
     .slice(0, 6);
 }
 
+function routeToState(posts: Post[]) {
+  const rawPath = window.location.pathname.replace(/\/$/, "") || "/";
+  const path = BASE_PATH && rawPath.startsWith(BASE_PATH) ? rawPath.slice(BASE_PATH.length) || "/" : rawPath;
+  const postMatch = path.match(/\/posts\/([^/]+)$/);
+
+  if (postMatch) {
+    const id = decodeURIComponent(postMatch[1]);
+    return { page: "detail" as Page, selectedId: posts.some((post) => post.id === id) ? id : posts[0]?.id ?? "" };
+  }
+
+  if (path.endsWith("/posts")) return { page: "posts" as Page, selectedId: posts[0]?.id ?? "" };
+  if (path.endsWith("/write")) return { page: "write" as Page, selectedId: posts[0]?.id ?? "" };
+  if (path.endsWith("/login")) return { page: "login" as Page, selectedId: posts[0]?.id ?? "" };
+  return { page: "home" as Page, selectedId: posts[0]?.id ?? "" };
+}
+
+function pagePath(page: Page, post?: Post) {
+  if (page === "posts") return "/posts";
+  if (page === "detail" && post) return `/posts/${encodeURIComponent(post.id)}`;
+  if (page === "write") return "/write";
+  if (page === "login") return "/login";
+  return "/";
+}
+
+function updateBrowserUrl(path: string) {
+  const nextPath = `${BASE_PATH}${path === "/" ? "" : path}` || "/";
+  if (window.location.pathname === nextPath) return;
+  window.history.pushState(null, "", nextPath);
+}
+
+function setMeta(selector: string, value: string) {
+  const element = document.head.querySelector(selector);
+  if (!element) return;
+  element.setAttribute("content", value);
+}
+
+function setCanonical(url: string) {
+  const element = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!element) return;
+  element.href = url;
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
   const [posts, setPosts] = useState<Post[]>(() => safeRead(STORAGE_KEY, starterPosts));
-  const [page, setPage] = useState<Page>("home");
+  const initialRoute = routeToState(posts);
+  const [page, setPage] = useState<Page>(initialRoute.page);
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category | "전체">("전체");
-  const [selectedId, setSelectedId] = useState(posts[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(initialRoute.selectedId);
   const [draft, setDraft] = useState<PostDraft>(emptyDraft);
   const [tagInput, setTagInput] = useState("");
   const [message, setMessage] = useState("");
@@ -61,6 +106,17 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const next = routeToState(posts);
+      setPage(next.page);
+      setSelectedId(next.selectedId);
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [posts]);
 
   useEffect(() => {
     if (!hasStoredToken()) {
@@ -97,6 +153,29 @@ export default function App() {
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
 
+  useEffect(() => {
+    const title = selectedPost && page === "detail" ? `${selectedPost.title} | 세웅이만의 블로그` : page === "posts" ? "글목록 | 세웅이만의 블로그" : "세웅이만의 블로그";
+    const description =
+      selectedPost && page === "detail"
+        ? selectedPost.excerpt
+        : page === "posts"
+          ? "AI 글쓰기, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발 글목록입니다."
+          : "AI 글쓰기, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발을 기록하는 실전 블로그입니다.";
+    const path = pagePath(page, selectedPost);
+    const url = `${SITE_URL}${path}`;
+    const robots = page === "login" || page === "write" ? "noindex, nofollow" : "index, follow, max-image-preview:large";
+
+    document.title = title;
+    setMeta('meta[name="description"]', description);
+    setMeta('meta[name="robots"]', robots);
+    setMeta('meta[property="og:title"]', title);
+    setMeta('meta[property="og:description"]', description);
+    setMeta('meta[property="og:url"]', url);
+    setMeta('meta[name="twitter:title"]', title);
+    setMeta('meta[name="twitter:description"]', description);
+    setCanonical(url);
+  }, [page, selectedPost]);
+
   const filteredPosts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return posts.filter((post) => {
@@ -111,6 +190,7 @@ export default function App() {
   function navigate(nextPage: Page) {
     if (nextPage === "login" && isLoggedIn) {
       setPage("write");
+      updateBrowserUrl("/write");
       setMenuOpen(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -119,6 +199,7 @@ export default function App() {
     if (nextPage === "write" && !isLoggedIn) {
       if (authChecking) {
         setPage("write");
+        updateBrowserUrl("/write");
         setMenuOpen(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -126,19 +207,25 @@ export default function App() {
 
       setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
       setPage("login");
+      updateBrowserUrl("/login");
       setMenuOpen(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     setPage(nextPage);
+    updateBrowserUrl(pagePath(nextPage, selectedPost));
     setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function openPost(id: string) {
+    const post = posts.find((item) => item.id === id);
     setSelectedId(id);
-    navigate("detail");
+    setPage("detail");
+    updateBrowserUrl(pagePath("detail", post));
+    setMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function persist(nextPosts: Post[]) {

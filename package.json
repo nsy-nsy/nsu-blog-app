@@ -8,7 +8,10 @@
     "dev:api": "node --experimental-strip-types server/server.ts",
     "dev:web": "vite --host 127.0.0.1",
     "db:setup": "node --experimental-strip-types server/setup-db.ts",
+    "seo:generate": "node --experimental-strip-types scripts/generate-seo.ts",
+    "prebuild": "npm run seo:generate",
     "build": "tsc -b && vite build",
+    "postbuild": "node --experimental-strip-types scripts/copy-spa-fallback.ts",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

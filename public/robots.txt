@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /nsu-blog-app/login
+Disallow: /nsu-blog-app/write
+Sitemap: https://nsy-nsy.github.io/nsu-blog-app/sitemap.xml

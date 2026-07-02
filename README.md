@@ -39,3 +39,17 @@ npm run dev:web
 ## 애드센스 연결
 
 현재 앱은 보안을 우선해서 외부 스크립트를 기본 차단합니다. 애드센스 승인 후에는 본인 Publisher ID로 `ads.txt`를 바꾸고, Google AdSense 공식 안내에 맞춰 광고 스크립트와 CSP 허용 도메인을 명시적으로 추가하세요.
+
+## 검색엔진 SEO 등록
+
+빌드 시 `public/sitemap.xml`, `public/robots.txt`, `dist/404.html`이 생성됩니다. 기본 사이트 주소는 GitHub Pages 기준 `https://nsy-nsy.github.io/nsu-blog-app`입니다.
+
+도메인이 바뀌면 빌드 전에 환경 변수로 실제 주소를 지정하세요.
+
+```bash
+$env:VITE_SITE_URL="https://example.com"
+$env:VITE_BASE_PATH="/"
+npm run build
+```
+
+Google Search Console과 Naver Search Advisor에서 사이트를 등록한 뒤 발급받은 인증 코드는 `index.html`의 주석 처리된 verification meta 태그에 넣으면 됩니다. 등록 후 각 콘솔에 `sitemap.xml` 주소를 제출하세요.
