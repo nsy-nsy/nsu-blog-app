@@ -10,6 +10,7 @@ type Theme = "light" | "dark";
 const STORAGE_KEY = "nsu-blog-posts-v5";
 const SITE_URL = (import.meta.env.VITE_SITE_URL ?? "https://nsy-nsy.github.io/nsu-blog-app").replace(/\/$/, "");
 const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, "");
+const ASSET_BASE = import.meta.env.BASE_URL;
 const categories: Category[] = ["블로그수익화", "AI글쓰기", "애드센스", "데이터분석", "웹개발", "인프라"];
 
 const emptyDraft: PostDraft = {
@@ -542,7 +543,7 @@ function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page: Page) 
           </div>
         </div>
         <div className="col-span-12 md:col-span-6">
-          <img className="h-full min-h-64 w-full rounded-xl object-cover shadow-2xl shadow-zinc-200 dark:shadow-black/50" src="/blog-hero.png" alt="블로그 콘텐츠 운영 화면과 분석 자료가 놓인 작업 공간" />
+          <img className="h-full min-h-64 w-full rounded-xl object-cover shadow-2xl shadow-zinc-200 dark:shadow-black/50" src={`${ASSET_BASE}blog-hero.png`} alt="블로그 콘텐츠 운영 화면과 분석 자료가 놓인 작업 공간" />
         </div>
       </section>
 
