@@ -13,6 +13,8 @@ npm run dev:web
 `dev:api`는 백엔드 인증 서버를 `http://127.0.0.1:4175`에서 실행합니다.
 `dev:web`은 Vite 프론트엔드를 실행하고 `/api` 요청을 백엔드로 프록시합니다.
 
+보안 관련 설정은 `.env`에 둡니다. 예시는 `.env.example`을 참고하세요.
+
 ## 구성
 
 - 글 작성, 목록, 상세 보기
@@ -29,7 +31,7 @@ npm run dev:web
 ## 관리자 로그인
 
 기본 아이디는 `seung`입니다. 첫 로그인 때 입력한 8자 이상 비밀번호가 관리자 비밀번호로 설정됩니다.
-비밀번호 원문은 저장하지 않고 `server/data/auth.json`에 해시로 저장됩니다. `server/data/`는 Git에 커밋되지 않습니다.
+비밀번호 원문은 저장하지 않고 `server/data/auth.json`에 해시로 저장됩니다. `server/data/`와 `.env`는 Git에 커밋되지 않습니다.
 
 ## 애드센스 연결
 
