@@ -23,11 +23,6 @@ function getSystemTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function getInitialAuth() {
-  if (typeof window === "undefined") return false;
-  return hasStoredToken();
-}
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
 }
@@ -55,9 +50,9 @@ export default function App() {
   const [draft, setDraft] = useState<PostDraft>(emptyDraft);
   const [tagInput, setTagInput] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(() => getInitialAuth());
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authChecking, setAuthChecking] = useState(() => getInitialAuth());
+  const [authChecking, setAuthChecking] = useState(() => (typeof window === "undefined" ? false : hasStoredToken()));
   const [loginId, setLoginId] = useState("");
   const [loginPasscode, setLoginPasscode] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
@@ -68,7 +63,10 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (!hasStoredToken()) return;
+    if (!hasStoredToken()) {
+      setAuthChecking(false);
+      return;
+    }
 
     fetchCurrentUser()
       .then((user) => {
@@ -82,6 +80,20 @@ export default function App() {
       })
       .finally(() => setAuthChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (authChecking) return;
+
+    if (page === "login" && isLoggedIn) {
+      setPage("write");
+      return;
+    }
+
+    if (page === "write" && !isLoggedIn) {
+      setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
+      setPage("login");
+    }
+  }, [authChecking, isLoggedIn, page]);
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
 
@@ -97,7 +109,21 @@ export default function App() {
   const featuredPosts = posts.slice(0, 3);
 
   function navigate(nextPage: Page) {
+    if (nextPage === "login" && isLoggedIn) {
+      setPage("write");
+      setMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     if (nextPage === "write" && !isLoggedIn) {
+      if (authChecking) {
+        setPage("write");
+        setMenuOpen(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
       setPage("login");
       setMenuOpen(false);
@@ -228,20 +254,19 @@ export default function App() {
         />
       )}
       {page === "detail" && <DetailPage isLoggedIn={isLoggedIn} onBack={() => navigate("posts")} onDelete={handleDelete} post={selectedPost} />}
-      {page === "login" && (
+      {page === "login" && authChecking && <AuthStatusCard message="로그인 상태를 확인 중입니다." />}
+      {page === "login" && !authChecking && !isLoggedIn && (
         <LoginPage
           loginId={loginId}
           loginMessage={loginMessage}
           loginPasscode={loginPasscode}
           loginPending={loginPending}
-          authChecking={authChecking}
-          authUser={authUser}
-          isLoggedIn={isLoggedIn}
           onLogin={handleLogin}
           setLoginId={setLoginId}
           setLoginPasscode={setLoginPasscode}
         />
       )}
+      {page === "write" && authChecking && <AuthStatusCard message="글쓰기 권한을 확인 중입니다." />}
       {page === "write" && isLoggedIn && (
         <WritePage
           categories={categories}
@@ -599,9 +624,6 @@ function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn: boolea
 }
 
 function LoginPage({
-  authChecking,
-  authUser,
-  isLoggedIn,
   loginId,
   loginMessage,
   loginPasscode,
@@ -610,9 +632,6 @@ function LoginPage({
   setLoginId,
   setLoginPasscode,
 }: {
-  authChecking: boolean;
-  authUser: AuthUser | null;
-  isLoggedIn: boolean;
   loginId: string;
   loginMessage: string;
   loginPasscode: string;
@@ -636,11 +655,6 @@ function LoginPage({
       </div>
 
       <form className="col-span-12 grid gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/30 md:col-span-7 md:p-6" onSubmit={onLogin}>
-        {isLoggedIn && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
-            현재 {authUser?.username ?? "관리자"} 계정으로 로그인되어 있습니다.
-          </div>
-        )}
         <label className="grid gap-2 text-sm font-extrabold">
           아이디
           <input
@@ -668,7 +682,7 @@ function LoginPage({
         </label>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-            {loginMessage || (authChecking ? "로그인 상태를 확인 중입니다." : "관리자 아이디와 사용할 비밀번호 8자 이상을 입력하세요.")}
+            {loginMessage || "관리자 아이디와 사용할 비밀번호 8자 이상을 입력하세요."}
           </p>
           <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200" disabled={loginPending} type="submit">
             <LogIn size={17} />
@@ -676,6 +690,16 @@ function LoginPage({
           </button>
         </div>
       </form>
+    </section>
+  );
+}
+
+function AuthStatusCard({ message }: { message: string }) {
+  return (
+    <section className="mx-auto grid max-w-7xl grid-cols-12 px-5 py-10 md:px-8 md:py-16">
+      <div className="col-span-12 rounded-xl border border-zinc-200 bg-white p-6 text-sm font-extrabold text-zinc-700 shadow-sm shadow-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:shadow-black/30">
+        {message}
+      </div>
     </section>
   );
 }
