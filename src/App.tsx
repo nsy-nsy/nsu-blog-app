@@ -8,7 +8,7 @@ type Theme = "light" | "dark";
 
 const STORAGE_KEY = "nsu-blog-posts-v5";
 const AUTH_KEY = "nsu-blog-auth-v1";
-const AUTH_HASH_KEY = "nsu-blog-owner-hash-v1";
+const AUTH_TOKEN_KEY = "nsu-blog-token-v1";
 const OWNER_ID = "seung";
 const categories: Category[] = ["블로그수익화", "AI글쓰기", "애드센스", "데이터분석", "웹개발", "인프라"];
 
@@ -27,7 +27,7 @@ function getSystemTheme(): Theme {
 
 function getInitialAuth() {
   if (typeof window === "undefined") return false;
-  return window.sessionStorage.getItem(AUTH_KEY) === "owner";
+  return Boolean(window.sessionStorage.getItem(AUTH_TOKEN_KEY));
 }
 
 function formatDate(value: string) {
@@ -46,14 +46,6 @@ function parseTags(value: string) {
     .slice(0, 6);
 }
 
-async function hashPasscode(value: string) {
-  const encoded = new TextEncoder().encode(value);
-  const buffer = await window.crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
   const [posts, setPosts] = useState<Post[]>(() => safeRead(STORAGE_KEY, starterPosts));
@@ -69,14 +61,33 @@ export default function App() {
   const [loginId, setLoginId] = useState("");
   const [loginPasscode, setLoginPasscode] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
-  const [ownerConfigured, setOwnerConfigured] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(window.localStorage.getItem(AUTH_HASH_KEY));
-  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  useEffect(() => {
+    const token = window.sessionStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) return;
+
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("unauthorized");
+        return response.json();
+      })
+      .then((data: { authenticated?: boolean }) => {
+        if (!data.authenticated) throw new Error("unauthorized");
+        window.sessionStorage.setItem(AUTH_KEY, "owner");
+        setIsLoggedIn(true);
+      })
+      .catch(() => {
+        window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
+        window.sessionStorage.removeItem(AUTH_KEY);
+        setIsLoggedIn(false);
+      });
+  }, []);
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
 
@@ -171,35 +182,33 @@ export default function App() {
       return;
     }
 
-    const passcodeHash = await hashPasscode(normalizedPasscode);
-    const savedHash = window.localStorage.getItem(AUTH_HASH_KEY);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalizedId, password: normalizedPasscode }),
+      });
+      const data = (await response.json()) as { token?: string; message?: string };
 
-    if (!savedHash) {
-      window.localStorage.setItem(AUTH_HASH_KEY, passcodeHash);
-      setOwnerConfigured(true);
-      window.sessionStorage.setItem(AUTH_KEY, "owner");
-      setIsLoggedIn(true);
-      setLoginId("");
-      setLoginPasscode("");
-      setLoginMessage("관리자 비밀번호가 설정되었습니다.");
-      navigate("write");
-      return;
-    }
+      if (!response.ok || !data.token) {
+        setLoginMessage(data.message ?? "아이디 또는 비밀번호가 맞지 않습니다.");
+        return;
+      }
 
-    if (savedHash === passcodeHash) {
+      window.sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
       window.sessionStorage.setItem(AUTH_KEY, "owner");
       setIsLoggedIn(true);
       setLoginId("");
       setLoginPasscode("");
       setLoginMessage("로그인되었습니다.");
       navigate("write");
-      return;
+    } catch {
+      setLoginMessage("백엔드 서버에 연결할 수 없습니다. npm run dev:api를 실행하세요.");
     }
-
-    setLoginMessage("아이디 또는 비밀번호가 맞지 않습니다.");
   }
 
   function handleLogout() {
+    window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
     window.sessionStorage.removeItem(AUTH_KEY);
     setIsLoggedIn(false);
     setMessage("");
@@ -237,7 +246,6 @@ export default function App() {
           loginId={loginId}
           loginMessage={loginMessage}
           loginPasscode={loginPasscode}
-          ownerConfigured={ownerConfigured}
           onLogin={handleLogin}
           setLoginId={setLoginId}
           setLoginPasscode={setLoginPasscode}
@@ -595,7 +603,6 @@ function LoginPage({
   loginId,
   loginMessage,
   loginPasscode,
-  ownerConfigured,
   onLogin,
   setLoginId,
   setLoginPasscode,
@@ -603,7 +610,6 @@ function LoginPage({
   loginId: string;
   loginMessage: string;
   loginPasscode: string;
-  ownerConfigured: boolean;
   onLogin: (event: FormEvent<HTMLFormElement>) => void;
   setLoginId: (value: string) => void;
   setLoginPasscode: (value: string) => void;
@@ -614,7 +620,7 @@ function LoginPage({
         <p className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">Owner Access</p>
         <h1 className="mt-3 text-3xl font-black leading-tight md:text-4xl">로그인 후 글을 작성하세요</h1>
         <p className="mt-5 max-w-md text-[15px] leading-7 text-zinc-650 dark:text-slate-300">
-          글쓰기는 관리자만 사용할 수 있습니다. 처음 로그인할 때 사용할 비밀번호를 설정하고, 이후에는 같은 비밀번호로 로그인합니다.
+          글쓰기는 백엔드 인증을 통과한 관리자만 사용할 수 있습니다. 처음 로그인할 때 입력한 비밀번호가 서버에 해시로 저장됩니다.
         </p>
         <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           <ShieldCheck size={15} />
@@ -648,7 +654,7 @@ function LoginPage({
         </label>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-            {loginMessage || (ownerConfigured ? "설정한 비밀번호로 로그인하세요." : "아이디 seung과 사용할 비밀번호 8자 이상을 입력하면 관리자 비밀번호가 설정됩니다.")}
+            {loginMessage || "아이디 seung과 사용할 비밀번호 8자 이상을 입력하세요."}
           </p>
           <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200" type="submit">
             <LogIn size={17} />
