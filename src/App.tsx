@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BookOpen, CalendarDays, Clock3, Home, List, LogIn, LogOut, Menu, Moon, PenLine, Search, ShieldCheck, Sun, Tag, X } from "lucide-react";
+import { clearAuth, fetchCurrentUser, hasStoredToken, login, type AuthUser } from "./auth";
 import { starterPosts } from "./posts";
 import { cleanText, makeId, safeRead, safeWrite } from "./security";
 import type { Category, Page, Post, PostDraft } from "./types";
@@ -7,9 +8,6 @@ import type { Category, Page, Post, PostDraft } from "./types";
 type Theme = "light" | "dark";
 
 const STORAGE_KEY = "nsu-blog-posts-v5";
-const AUTH_KEY = "nsu-blog-auth-v1";
-const AUTH_TOKEN_KEY = "nsu-blog-token-v1";
-const OWNER_ID = "seung";
 const categories: Category[] = ["블로그수익화", "AI글쓰기", "애드센스", "데이터분석", "웹개발", "인프라"];
 
 const emptyDraft: PostDraft = {
@@ -27,7 +25,7 @@ function getSystemTheme(): Theme {
 
 function getInitialAuth() {
   if (typeof window === "undefined") return false;
-  return Boolean(window.sessionStorage.getItem(AUTH_TOKEN_KEY));
+  return hasStoredToken();
 }
 
 function formatDate(value: string) {
@@ -58,35 +56,31 @@ export default function App() {
   const [tagInput, setTagInput] = useState("");
   const [message, setMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(() => getInitialAuth());
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecking, setAuthChecking] = useState(() => getInitialAuth());
   const [loginId, setLoginId] = useState("");
   const [loginPasscode, setLoginPasscode] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
+  const [loginPending, setLoginPending] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
   useEffect(() => {
-    const token = window.sessionStorage.getItem(AUTH_TOKEN_KEY);
-    if (!token) return;
+    if (!hasStoredToken()) return;
 
-    fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error("unauthorized");
-        return response.json();
-      })
-      .then((data: { authenticated?: boolean }) => {
-        if (!data.authenticated) throw new Error("unauthorized");
-        window.sessionStorage.setItem(AUTH_KEY, "owner");
-        setIsLoggedIn(true);
+    fetchCurrentUser()
+      .then((user) => {
+        setAuthUser(user);
+        setIsLoggedIn(Boolean(user));
       })
       .catch(() => {
-        window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
-        window.sessionStorage.removeItem(AUTH_KEY);
+        clearAuth();
+        setAuthUser(null);
         setIsLoggedIn(false);
-      });
+      })
+      .finally(() => setAuthChecking(false));
   }, []);
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
@@ -177,39 +171,31 @@ export default function App() {
     const normalizedId = cleanText(loginId, 24).toLowerCase();
     const normalizedPasscode = cleanText(loginPasscode, 40);
 
-    if (normalizedId !== OWNER_ID || normalizedPasscode.length < 8) {
-      setLoginMessage("아이디는 seung, 비밀번호는 8자 이상이어야 합니다.");
+    if (!normalizedId || normalizedPasscode.length < 8) {
+      setLoginMessage("관리자 아이디와 8자 이상 비밀번호를 입력하세요.");
       return;
     }
 
+    setLoginPending(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalizedId, password: normalizedPasscode }),
-      });
-      const data = (await response.json()) as { token?: string; message?: string };
-
-      if (!response.ok || !data.token) {
-        setLoginMessage(data.message ?? "아이디 또는 비밀번호가 맞지 않습니다.");
-        return;
-      }
-
-      window.sessionStorage.setItem(AUTH_TOKEN_KEY, data.token);
-      window.sessionStorage.setItem(AUTH_KEY, "owner");
+      const user = await login(normalizedId, normalizedPasscode);
+      setAuthUser(user);
       setIsLoggedIn(true);
       setLoginId("");
       setLoginPasscode("");
       setLoginMessage("로그인되었습니다.");
       navigate("write");
-    } catch {
-      setLoginMessage("백엔드 서버에 연결할 수 없습니다. npm run dev:api를 실행하세요.");
+    } catch (error) {
+      const errorMessage = error instanceof Error && error.message !== "Failed to fetch" ? error.message : "백엔드 서버에 연결할 수 없습니다. npm run dev:api를 실행하세요.";
+      setLoginMessage(errorMessage);
+    } finally {
+      setLoginPending(false);
     }
   }
 
   function handleLogout() {
-    window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
-    window.sessionStorage.removeItem(AUTH_KEY);
+    clearAuth();
+    setAuthUser(null);
     setIsLoggedIn(false);
     setMessage("");
     if (page === "write") navigate("home");
@@ -219,6 +205,7 @@ export default function App() {
     <main className="min-h-screen bg-[#f7f7f5] text-zinc-950 transition-colors dark:bg-[#050505] dark:text-zinc-50">
       <Header
         menuOpen={menuOpen}
+        authUser={authUser}
         isLoggedIn={isLoggedIn}
         onNavigate={navigate}
         onLogout={handleLogout}
@@ -246,6 +233,10 @@ export default function App() {
           loginId={loginId}
           loginMessage={loginMessage}
           loginPasscode={loginPasscode}
+          loginPending={loginPending}
+          authChecking={authChecking}
+          authUser={authUser}
+          isLoggedIn={isLoggedIn}
           onLogin={handleLogin}
           setLoginId={setLoginId}
           setLoginPasscode={setLoginPasscode}
@@ -269,6 +260,7 @@ export default function App() {
 }
 
 function Header({
+  authUser,
   isLoggedIn,
   menuOpen,
   onNavigate,
@@ -278,6 +270,7 @@ function Header({
   page,
   theme,
 }: {
+  authUser: AuthUser | null;
   isLoggedIn: boolean;
   menuOpen: boolean;
   onNavigate: (page: Page) => void;
@@ -329,10 +322,13 @@ function Header({
             <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
 
             {isLoggedIn ? (
-              <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white" type="button" onClick={onLogout}>
-                <LogOut size={15} />
-                로그아웃
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="max-w-24 truncate text-[12px] font-extrabold text-zinc-500 dark:text-zinc-400">{authUser?.username ?? "관리자"}</span>
+                <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-zinc-700 transition hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white" type="button" onClick={onLogout}>
+                  <LogOut size={15} />
+                  로그아웃
+                </button>
+              </div>
             ) : (
               <button className={`inline-flex items-center gap-1.5 text-[13px] font-extrabold transition ${page === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"}`} type="button" onClick={() => onNavigate("login")}>
                 <LogIn size={15} />
@@ -395,10 +391,13 @@ function Header({
             );
           })}
           {isLoggedIn ? (
-            <button className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-black text-zinc-700 dark:text-zinc-300" type="button" onClick={onLogout}>
-              <LogOut size={18} />
-              로그아웃
-            </button>
+            <div className="grid gap-1 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+              <span className="px-4 py-1 text-xs font-extrabold text-zinc-500 dark:text-zinc-400">{authUser?.username ?? "관리자"} 로그인 중</span>
+              <button className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-black text-zinc-700 dark:text-zinc-300" type="button" onClick={onLogout}>
+                <LogOut size={18} />
+                로그아웃
+              </button>
+            </div>
           ) : (
             <button className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left font-black ${page === "login" ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950" : "text-zinc-700 dark:text-zinc-300"}`} type="button" onClick={() => onNavigate("login")}>
               <LogIn size={18} />
@@ -600,16 +599,24 @@ function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn: boolea
 }
 
 function LoginPage({
+  authChecking,
+  authUser,
+  isLoggedIn,
   loginId,
   loginMessage,
   loginPasscode,
+  loginPending,
   onLogin,
   setLoginId,
   setLoginPasscode,
 }: {
+  authChecking: boolean;
+  authUser: AuthUser | null;
+  isLoggedIn: boolean;
   loginId: string;
   loginMessage: string;
   loginPasscode: string;
+  loginPending: boolean;
   onLogin: (event: FormEvent<HTMLFormElement>) => void;
   setLoginId: (value: string) => void;
   setLoginPasscode: (value: string) => void;
@@ -620,7 +627,7 @@ function LoginPage({
         <p className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">Owner Access</p>
         <h1 className="mt-3 text-3xl font-black leading-tight md:text-4xl">로그인 후 글을 작성하세요</h1>
         <p className="mt-5 max-w-md text-[15px] leading-7 text-zinc-650 dark:text-slate-300">
-          글쓰기는 백엔드 인증을 통과한 관리자만 사용할 수 있습니다. 처음 로그인할 때 입력한 비밀번호가 서버에 해시로 저장됩니다.
+          글쓰기는 백엔드와 MySQL 인증을 통과한 관리자만 사용할 수 있습니다. 처음 로그인할 때 입력한 비밀번호가 서버에 해시로 저장됩니다.
         </p>
         <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           <ShieldCheck size={15} />
@@ -629,14 +636,20 @@ function LoginPage({
       </div>
 
       <form className="col-span-12 grid gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-200/60 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/30 md:col-span-7 md:p-6" onSubmit={onLogin}>
+        {isLoggedIn && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
+            현재 {authUser?.username ?? "관리자"} 계정으로 로그인되어 있습니다.
+          </div>
+        )}
         <label className="grid gap-2 text-sm font-extrabold">
           아이디
           <input
             autoComplete="username"
             className="rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900"
+            disabled={loginPending}
             maxLength={24}
             onChange={(event) => setLoginId(event.target.value)}
-            placeholder="seung"
+            placeholder="관리자 아이디"
             value={loginId}
           />
         </label>
@@ -645,6 +658,7 @@ function LoginPage({
           <input
             autoComplete="current-password"
             className="rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900"
+            disabled={loginPending}
             maxLength={40}
             onChange={(event) => setLoginPasscode(event.target.value)}
             placeholder="비밀번호 입력"
@@ -654,11 +668,11 @@ function LoginPage({
         </label>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-            {loginMessage || "아이디 seung과 사용할 비밀번호 8자 이상을 입력하세요."}
+            {loginMessage || (authChecking ? "로그인 상태를 확인 중입니다." : "관리자 아이디와 사용할 비밀번호 8자 이상을 입력하세요.")}
           </p>
-          <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200" type="submit">
+          <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200" disabled={loginPending} type="submit">
             <LogIn size={17} />
-            로그인
+            {loginPending ? "확인 중" : "로그인"}
           </button>
         </div>
       </form>
