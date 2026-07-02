@@ -7,13 +7,16 @@
     "dev": "vite --host 127.0.0.1",
     "dev:api": "node --experimental-strip-types server/server.ts",
     "dev:web": "vite --host 127.0.0.1",
+    "db:setup": "node --experimental-strip-types server/setup-db.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@tailwindcss/vite": "4.3.2",
     "@vitejs/plugin-react": "latest",
+    "dotenv": "^17.4.2",
     "lucide-react": "^1.23.0",
+    "mysql2": "^3.22.5",
     "react": "latest",
     "react-dom": "latest",
     "tailwindcss": "4.3.2",

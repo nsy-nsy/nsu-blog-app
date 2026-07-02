@@ -1,16 +1,11 @@
 import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-type AuthFile = {
-  username: string;
-  passwordHash: {
-    salt: string;
-    hash: string;
-  };
-};
+import { getAdminAuth, saveAdminAuth, type PasswordHash } from "./auth-store.ts";
+import { apiConfig } from "./config.ts";
+import { pingDatabase } from "./db.ts";
 
 type TokenPayload = {
   sub: string;
@@ -19,45 +14,11 @@ type TokenPayload = {
 };
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = resolve(__dirname, "..");
-const envFile = join(projectRoot, ".env");
-
-loadEnv(envFile);
-
 const dataDir = join(__dirname, "data");
-const authFile = join(dataDir, "auth.json");
 const secretFile = join(dataDir, "session-secret.txt");
-const port = Number(process.env.API_PORT ?? 4175);
-const adminUser = process.env.ADMIN_USER ?? "seung";
-const tokenMaxAgeSeconds = Number(process.env.TOKEN_MAX_AGE_SECONDS ?? 60 * 60 * 8);
+const { port, adminUser, tokenMaxAgeSeconds } = apiConfig;
 
 mkdirSync(dataDir, { recursive: true });
-
-function loadEnv(path: string) {
-  if (!existsSync(path)) return;
-
-  const lines = readFileSync(path, "utf8").split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const separator = trimmed.indexOf("=");
-    if (separator === -1) continue;
-
-    const key = trimmed.slice(0, separator).trim();
-    const rawValue = trimmed.slice(separator + 1).trim();
-    const value = rawValue.replace(/^["']|["']$/g, "");
-    if (key && process.env[key] === undefined) process.env[key] = value;
-  }
-}
-
-function readJson<T>(path: string, fallback: T): T {
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
-}
 
 function getSecret() {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32) {
@@ -78,7 +39,7 @@ function hashPassword(password: string, salt = randomBytes(16).toString("hex")) 
   return { salt, hash };
 }
 
-function verifyPassword(password: string, saved?: AuthFile["passwordHash"]) {
+function verifyPassword(password: string, saved?: PasswordHash) {
   if (!saved?.salt || !saved?.hash) return false;
   const candidate = hashPassword(password, saved.salt).hash;
   return timingSafeEqual(Buffer.from(candidate, "hex"), Buffer.from(saved.hash, "hex"));
@@ -124,7 +85,13 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
 
 async function readBody(request: IncomingMessage) {
   const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > 64 * 1024) throw new Error("Payload too large");
+    chunks.push(buffer);
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw) return {};
   return JSON.parse(raw) as Record<string, unknown>;
@@ -140,7 +107,12 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
 
     if (request.method === "GET" && url.pathname === "/api/health") {
-      sendJson(response, 200, { ok: true });
+      try {
+        await pingDatabase();
+        sendJson(response, 200, { ok: true, database: "ok" });
+      } catch {
+        sendJson(response, 200, { ok: true, database: "unavailable" });
+      }
       return;
     }
 
@@ -154,16 +126,16 @@ const server = createServer(async (request, response) => {
       const body = await readBody(request);
       const username = String(body.username ?? "").trim().toLowerCase();
       const password = String(body.password ?? "");
-      const auth = readJson<AuthFile | null>(authFile, null);
 
       if (username !== adminUser || password.length < 8) {
         sendJson(response, 401, { message: "아이디 또는 비밀번호가 맞지 않습니다." });
         return;
       }
 
+      const auth = await getAdminAuth(adminUser);
       if (!auth) {
         const passwordHash = hashPassword(password);
-        writeFileSync(authFile, JSON.stringify({ username: adminUser, passwordHash }, null, 2), { mode: 0o600 });
+        await saveAdminAuth(adminUser, passwordHash);
       } else if (auth.username !== adminUser || !verifyPassword(password, auth.passwordHash)) {
         sendJson(response, 401, { message: "아이디 또는 비밀번호가 맞지 않습니다." });
         return;
@@ -176,7 +148,8 @@ const server = createServer(async (request, response) => {
     }
 
     sendJson(response, 404, { message: "Not found" });
-  } catch {
+  } catch (error) {
+    console.error(error);
     sendJson(response, 500, { message: "Server error" });
   }
 });
