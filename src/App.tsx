@@ -410,6 +410,18 @@ function Header({
 
         <div className="flex shrink-0 items-center justify-end gap-2">
           <div className="hidden items-center gap-5 rounded-2xl border border-zinc-200/80 bg-white/70 px-4 py-2 shadow-sm shadow-zinc-200/40 dark:border-zinc-800 dark:bg-zinc-950/70 dark:shadow-black/20 md:flex">
+            <button
+              aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
+              className="relative grid size-8 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-950 transition hover:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:hover:border-zinc-500"
+              type="button"
+              onClick={onToggleTheme}
+            >
+              <Sun className={`absolute transition duration-300 ${theme === "dark" ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"}`} size={17} />
+              <Moon className={`absolute transition duration-300 ${theme === "dark" ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"}`} size={17} />
+            </button>
+
+            <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
+
             <nav className="flex items-center gap-5" aria-label="주요 메뉴">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -448,18 +460,6 @@ function Header({
                 로그인
               </button>
             )}
-
-            <span className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
-
-            <button
-              aria-label={theme === "dark" ? "라이트모드로 변경" : "다크모드로 변경"}
-              className="relative grid size-8 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-950 transition hover:border-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:hover:border-zinc-500"
-              type="button"
-              onClick={onToggleTheme}
-            >
-              <Sun className={`absolute transition duration-300 ${theme === "dark" ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100"}`} size={17} />
-              <Moon className={`absolute transition duration-300 ${theme === "dark" ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0"}`} size={17} />
-            </button>
           </div>
 
           <button
