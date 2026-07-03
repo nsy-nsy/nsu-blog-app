@@ -13,6 +13,30 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://nsy-nsy.github.io/nsu-blog-app/posts/almalinux-server-install-guide</loc>
+    <lastmod>2026-07-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nsy-nsy.github.io/nsu-blog-app/posts/linux-install-guide</loc>
+    <lastmod>2026-07-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nsy-nsy.github.io/nsu-blog-app/posts/linux-distro-types</loc>
+    <lastmod>2026-07-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://nsy-nsy.github.io/nsu-blog-app/posts/python-install-guide</loc>
+    <lastmod>2026-07-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://nsy-nsy.github.io/nsu-blog-app/posts/roa-hiking-sella-sneakers</loc>
     <lastmod>2024-10-13</lastmod>
     <changefreq>weekly</changefreq>

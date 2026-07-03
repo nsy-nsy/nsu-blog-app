@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">AlmaLinux server installation</title>
+  <desc id="desc">Server rack and AlmaLinux terminal illustration</desc>
+  <rect width="1200" height="760" fill="#0b0f19"/>
+  <rect x="80" y="90" width="1040" height="580" rx="28" fill="#111827" stroke="#263244" stroke-width="3"/>
+  <rect x="135" y="145" width="340" height="470" rx="18" fill="#020617" stroke="#334155" stroke-width="2"/>
+  <rect x="170" y="185" width="270" height="72" rx="12" fill="#1f2937"/>
+  <rect x="170" y="286" width="270" height="72" rx="12" fill="#1f2937"/>
+  <rect x="170" y="387" width="270" height="72" rx="12" fill="#1f2937"/>
+  <circle cx="205" cy="221" r="11" fill="#22c55e"/>
+  <circle cx="205" cy="322" r="11" fill="#22c55e"/>
+  <circle cx="205" cy="423" r="11" fill="#f59e0b"/>
+  <rect x="550" y="165" width="500" height="330" rx="20" fill="#030712" stroke="#334155" stroke-width="2"/>
+  <text x="590" y="225" fill="#22c55e" font-family="Consolas, monospace" font-size="36" font-weight="700">$ almalinux setup</text>
+  <text x="590" y="285" fill="#e5e7eb" font-family="Consolas, monospace" font-size="28">disk: /dev/sda</text>
+  <text x="590" y="335" fill="#e5e7eb" font-family="Consolas, monospace" font-size="28">network: connected</text>
+  <text x="590" y="385" fill="#e5e7eb" font-family="Consolas, monospace" font-size="28">ssh: enabled</text>
+  <text x="590" y="435" fill="#38bdf8" font-family="Consolas, monospace" font-size="28">ready for server</text>
+  <text x="550" y="575" fill="#f8fafc" font-family="Arial, sans-serif" font-size="46" font-weight="800">AlmaLinux Server</text>
+  <text x="552" y="622" fill="#94a3b8" font-family="Arial, sans-serif" font-size="24">Installation checklist</text>
+</svg>

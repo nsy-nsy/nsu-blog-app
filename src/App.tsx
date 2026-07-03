@@ -39,7 +39,7 @@ export default function App() {
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
   const filteredPosts = useMemo(() => filterPosts(posts, activeCategory, query), [activeCategory, posts, query]);
-  const featuredPosts = posts.slice(0, 3);
+  const featuredPosts = posts.slice(0, 5);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");

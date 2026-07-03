@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Linux installation guide</title>
+  <desc id="desc">Laptop with Linux boot USB illustration</desc>
+  <rect width="1200" height="760" fill="#f4f4f5"/>
+  <rect x="170" y="130" width="860" height="500" rx="30" fill="#18181b"/>
+  <rect x="220" y="180" width="760" height="390" rx="18" fill="#0f172a"/>
+  <circle cx="600" cy="375" r="120" fill="#22c55e"/>
+  <path d="M548 427V322h43c38 0 64 19 64 52s-26 53-64 53h-43zm42-34h9c12 0 20-7 20-19s-8-18-20-18h-9v37z" fill="#052e16"/>
+  <rect x="460" y="630" width="280" height="40" rx="20" fill="#27272a"/>
+  <rect x="870" y="515" width="130" height="42" rx="12" fill="#eab308"/>
+  <rect x="930" y="486" width="40" height="100" rx="12" fill="#a16207"/>
+  <text x="190" y="92" fill="#18181b" font-family="Arial, sans-serif" font-size="46" font-weight="800">Linux 설치 가이드</text>
+  <text x="190" y="690" fill="#52525b" font-family="Arial, sans-serif" font-size="26">USB 부팅부터 설치 후 점검까지</text>
+</svg>
