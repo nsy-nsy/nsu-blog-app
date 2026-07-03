@@ -8,7 +8,7 @@ export function Footer() {
             <span>세웅이만의 블로그</span>
           </div>
           <p className="mt-4 max-w-xl leading-7 text-zinc-600 dark:text-zinc-300">
-            일상 기록, 검색에 도움 되는 정보, 컴퓨터와 윈도우 사용 팁을 차곡차곡 쌓아가는 개인 블로그입니다.
+            루이의 신발 리뷰와 일상 기록을 중심으로, 나중에 다시 찾아볼 수 있는 글을 남기는 개인 블로그입니다.
           </p>
         </div>
       </div>

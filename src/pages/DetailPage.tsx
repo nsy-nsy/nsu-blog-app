@@ -26,12 +26,12 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
       </button>
 
       <header className="border-b border-zinc-200 pb-8 dark:border-zinc-800">
-        <p className="text-xs font-black text-emerald-700 dark:text-emerald-400">{post.category}</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">{post.category}</p>
         <h1 className="mt-4 text-3xl font-semibold leading-tight md:text-4xl">{post.title}</h1>
         <p className="mt-4 max-w-3xl text-[15px] leading-7 text-zinc-600 dark:text-zinc-300">{post.excerpt}</p>
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
           <span>
-            <em className="font-serif italic">by</em> <strong className="text-zinc-800 dark:text-zinc-200">세웅</strong>
+            <em className="font-serif italic">by</em> <strong className="text-zinc-800 dark:text-zinc-200">루이</strong>
           </span>
           <span className="inline-flex gap-4">
             <span>{formatDate(post.createdAt)}</span>
@@ -61,7 +61,7 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
       <div className="mt-10 whitespace-pre-wrap text-[15.5px] leading-8 text-zinc-850 dark:text-zinc-100 md:text-base">{post.body}</div>
 
       <footer className="mt-12 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
-        <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Search intent</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">Search intent</p>
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{post.searchIntent}</p>
         {isLoggedIn && isUserPost && (
           <button
