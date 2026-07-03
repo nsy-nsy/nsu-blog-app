@@ -13,9 +13,9 @@ import { starterPosts } from "./posts";
 import { cleanText, makeId, safeRead, safeWrite } from "./security";
 import type { Category, Page, Post, PostDraft, Theme } from "./types";
 import { estimateReadMinutes, parseTags } from "./utils/blog";
-import { getSystemTheme } from "./utils/theme";
 import { pagePath, routeToState, updateBrowserUrl } from "./utils/routing";
 import { updatePageSeo } from "./utils/seo";
+import { getSystemTheme } from "./utils/theme";
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
@@ -159,7 +159,7 @@ export default function App() {
       id: makeId(),
       createdAt: new Date().toISOString(),
       readMinutes: estimateReadMinutes(body),
-      searchIntent: "직접 작성한 블로그 글",
+      searchIntent: "직접 작성한 개인 블로그 글",
     };
 
     persist([post, ...posts].slice(0, 80));

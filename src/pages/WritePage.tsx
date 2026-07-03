@@ -19,12 +19,12 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
         <p className="text-xs font-black uppercase text-emerald-700 dark:text-emerald-400">Write</p>
         <h1 className="mt-2 text-3xl font-black leading-tight md:text-4xl">글쓰기</h1>
         <p className="mt-5 text-[15px] leading-7 text-zinc-700 dark:text-zinc-300">
-          작성한 글은 현재 브라우저에 저장됩니다. 입력값은 길이 제한과 제어문자 제거를 거치고, 본문은 HTML로 실행되지 않습니다.
+          일상 기록, 생활 정보, 컴퓨터 팁처럼 내가 직접 경험한 내용을 작성해보세요. 입력값은 길이 제한과 기본 정리를 거쳐 저장됩니다.
         </p>
       </div>
 
       <form className="col-span-12 grid gap-4 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950 md:col-span-8" onSubmit={onSubmit}>
-        <FormInput label="제목" maxLength={90} onChange={(value) => onDraftChange({ ...draft, title: value })} placeholder="예: 애드센스 승인 전 꼭 준비해야 할 5가지" value={draft.title} />
+        <FormInput label="제목" maxLength={90} onChange={(value) => onDraftChange({ ...draft, title: value })} placeholder="예: 컴퓨터가 느려졌을 때 먼저 확인할 것" value={draft.title} />
         <label className="grid gap-2 font-bold">
           카테고리
           <select className="rounded-xl border border-zinc-300 bg-white px-4 py-3 outline-none focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900" value={draft.category} onChange={(event) => onDraftChange({ ...draft, category: event.target.value as Category })}>
@@ -34,7 +34,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
           </select>
         </label>
         <FormInput label="요약" maxLength={220} onChange={(value) => onDraftChange({ ...draft, excerpt: value })} placeholder="글목록에 보일 짧은 설명" value={draft.excerpt} />
-        <FormInput label="태그" maxLength={120} onChange={setTagInput} placeholder="예: 애드센스, SEO, 블로그" value={tagInput} />
+        <FormInput label="태그" maxLength={120} onChange={setTagInput} placeholder="예: 컴퓨터, 윈도우, 일상" value={tagInput} />
         <label className="grid gap-2 font-bold">
           본문
           <textarea className="min-h-72 resize-y rounded-xl border border-zinc-300 bg-white px-4 py-3 outline-none focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900" value={draft.body} maxLength={9000} onChange={(event) => onDraftChange({ ...draft, body: event.target.value })} placeholder="본문을 입력하세요." />

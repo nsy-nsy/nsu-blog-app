@@ -7,7 +7,7 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
     return (
       <section className="mx-auto grid max-w-7xl grid-cols-12 px-5 py-14 md:px-8">
         <div className="col-span-12 rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950">
-          <p className="text-zinc-600 dark:text-zinc-300">선택된 글이 없습니다.</p>
+          <p className="text-zinc-600 dark:text-zinc-300">선택한 글이 없습니다.</p>
           <button className="mt-5 rounded-xl bg-zinc-950 px-5 py-3 font-black text-white dark:bg-white dark:text-zinc-950" type="button" onClick={onBack}>
             글목록으로
           </button>

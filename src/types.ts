@@ -1,4 +1,4 @@
-export type Category = "블로그수익화" | "AI글쓰기" | "애드센스" | "데이터분석" | "웹개발" | "인프라";
+export type Category = "일상기록" | "생활정보" | "컴퓨터" | "윈도우" | "블로그운영" | "리뷰";
 export type Theme = "light" | "dark";
 
 export type Post = {

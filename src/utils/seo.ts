@@ -25,8 +25,8 @@ export function updatePageSeo(page: Page, selectedPost?: Post) {
     selectedPost && page === "detail"
       ? selectedPost.excerpt
       : page === "posts"
-        ? "AI 글쓰기, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발 글목록입니다."
-        : "AI 글쓰기, 블로그 수익화, 애드센스, 데이터 분석, React 웹개발을 기록하는 실전 블로그입니다.";
+        ? "일상 기록, 생활 정보, 컴퓨터 팁, 윈도우 사용법, 블로그 운영 글을 모아둔 글목록입니다."
+        : "세웅이의 일상과 사람들이 자주 검색하는 생활 정보, 컴퓨터와 윈도우 사용 팁을 기록하는 개인 블로그입니다.";
   const path = pagePath(page, selectedPost);
   const url = `${SITE_URL}${path}`;
   const robots = page === "login" || page === "write" ? "noindex, nofollow" : "index, follow, max-image-preview:large";
