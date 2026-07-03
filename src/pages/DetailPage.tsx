@@ -1,4 +1,5 @@
 import { Tag } from "lucide-react";
+import { ASSET_BASE } from "../config";
 import type { Post } from "../types";
 import { formatDate } from "../utils/blog";
 
@@ -46,6 +47,16 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
           </span>
         ))}
       </div>
+
+      {post.images && post.images.length > 0 && (
+        <div className="mt-10 grid gap-4">
+          {post.images.map((image, index) => (
+            <figure key={image} className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+              <img className="w-full object-cover" src={`${ASSET_BASE}${image}`} alt={`${post.title} 사진 ${index + 1}`} loading={index > 1 ? "lazy" : "eager"} />
+            </figure>
+          ))}
+        </div>
+      )}
 
       <div className="mt-10 whitespace-pre-wrap text-[15.5px] leading-8 text-zinc-850 dark:text-zinc-100 md:text-base">{post.body}</div>
 

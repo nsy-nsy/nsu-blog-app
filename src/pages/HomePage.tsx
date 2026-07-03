@@ -29,7 +29,7 @@ export function HomePage({ onNavigate, onOpenPost, posts }: { onNavigate: (page:
 
       <section className="border-y border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
         <div className="mx-auto grid max-w-7xl grid-cols-12 divide-y divide-zinc-200 px-5 dark:divide-zinc-800 md:divide-x md:divide-y-0 md:px-8">
-          <Stat className="col-span-12 md:col-span-3" label="기본 글" value="5개" />
+          <Stat className="col-span-12 md:col-span-3" label="기본 글" value="1개" />
           <Stat className="col-span-12 md:col-span-3" label="주요 주제" value="일상" />
           <Stat className="col-span-12 md:col-span-3" label="정보 글" value="검색형" />
           <Stat className="col-span-12 md:col-span-3" label="컴퓨터 팁" value="꾸준히" />

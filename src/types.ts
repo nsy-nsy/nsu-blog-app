@@ -7,6 +7,7 @@ export type Post = {
   category: Category;
   excerpt: string;
   body: string;
+  images?: string[];
   createdAt: string;
   readMinutes: number;
   tags: string[];
