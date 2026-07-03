@@ -17,6 +17,8 @@ import { pagePath, routeToState, updateBrowserUrl } from "./utils/routing";
 import { updatePageSeo } from "./utils/seo";
 import { getSystemTheme } from "./utils/theme";
 
+const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 잘못되었습니다.";
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
   const [posts, setPosts] = useState<Post[]>(() => safeRead(STORAGE_KEY, starterPosts));
@@ -183,7 +185,7 @@ export default function App() {
     const normalizedPasscode = cleanText(loginPasscode, 40);
 
     if (!normalizedId || normalizedPasscode.length < 8) {
-      setLoginMessage("관리자 아이디와 8자 이상 비밀번호를 입력하세요.");
+      setLoginMessage(INVALID_LOGIN_MESSAGE);
       return;
     }
 
@@ -194,11 +196,13 @@ export default function App() {
       setIsLoggedIn(true);
       setLoginId("");
       setLoginPasscode("");
-      setLoginMessage("로그인되었습니다.");
+      setLoginMessage("");
       navigate("write");
-    } catch (error) {
-      const errorMessage = error instanceof Error && error.message !== "Failed to fetch" ? error.message : "백엔드 서버에 연결할 수 없습니다. npm run dev:api를 실행하세요.";
-      setLoginMessage(errorMessage);
+    } catch {
+      clearAuth();
+      setAuthUser(null);
+      setIsLoggedIn(false);
+      setLoginMessage(INVALID_LOGIN_MESSAGE);
     } finally {
       setLoginPending(false);
     }

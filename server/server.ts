@@ -1,6 +1,6 @@
 import { createHmac, pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAdminAuth, saveAdminAuth, type PasswordHash } from "./auth-store.ts";
@@ -17,6 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "data");
 const secretFile = join(dataDir, "session-secret.txt");
 const { port, adminUser, tokenMaxAgeSeconds } = apiConfig;
+const invalidLoginMessage = "아이디나 비밀번호가 잘못되었습니다.";
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -79,6 +80,7 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
   });
   response.end(JSON.stringify(body));
 }
@@ -128,7 +130,7 @@ const server = createServer(async (request, response) => {
       const password = String(body.password ?? "");
 
       if (username !== adminUser || password.length < 8) {
-        sendJson(response, 401, { message: "아이디 또는 비밀번호가 맞지 않습니다." });
+        sendJson(response, 401, { message: invalidLoginMessage });
         return;
       }
 
@@ -137,7 +139,7 @@ const server = createServer(async (request, response) => {
         const passwordHash = hashPassword(password);
         await saveAdminAuth(adminUser, passwordHash);
       } else if (auth.username !== adminUser || !verifyPassword(password, auth.passwordHash)) {
-        sendJson(response, 401, { message: "아이디 또는 비밀번호가 맞지 않습니다." });
+        sendJson(response, 401, { message: invalidLoginMessage });
         return;
       }
 

@@ -1,7 +1,16 @@
 const AUTH_TOKEN_KEY = "nsu-blog-token-v1";
+const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 잘못되었습니다.";
 
 export type AuthUser = {
   username: string;
+};
+
+type AuthResponse = {
+  authenticated?: boolean;
+  expiresIn?: number;
+  message?: string;
+  token?: string;
+  user?: string | null;
 };
 
 export function getStoredToken() {
@@ -20,6 +29,19 @@ export function clearAuth() {
   window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
 }
 
+async function readAuthJson(response: Response) {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new Error(INVALID_LOGIN_MESSAGE);
+  }
+
+  try {
+    return (await response.json()) as AuthResponse;
+  } catch {
+    throw new Error(INVALID_LOGIN_MESSAGE);
+  }
+}
+
 export async function fetchCurrentUser() {
   const token = getStoredToken();
   if (!token) return null;
@@ -33,7 +55,7 @@ export async function fetchCurrentUser() {
     return null;
   }
 
-  const data = (await response.json()) as { authenticated?: boolean; user?: string | null };
+  const data = await readAuthJson(response);
   if (!data.authenticated || !data.user) {
     clearAuth();
     return null;
@@ -43,15 +65,20 @@ export async function fetchCurrentUser() {
 }
 
 export async function login(username: string, password: string) {
-  const response = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    throw new Error(INVALID_LOGIN_MESSAGE);
+  }
 
-  const data = (await response.json()) as { token?: string; user?: string; message?: string };
+  const data = await readAuthJson(response);
   if (!response.ok || !data.token || !data.user) {
-    throw new Error(data.message ?? "아이디 또는 비밀번호가 맞지 않습니다.");
+    throw new Error(INVALID_LOGIN_MESSAGE);
   }
 
   storeToken(data.token);
