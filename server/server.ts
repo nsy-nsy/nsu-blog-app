@@ -17,7 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "data");
 const secretFile = join(dataDir, "session-secret.txt");
 const { port, adminUser, tokenMaxAgeSeconds } = apiConfig;
-const invalidLoginMessage = "아이디나 비밀번호가 잘못되었습니다.";
+const invalidLoginMessage = "아이디나 비밀번호가 올바르지 않습니다.";
 
 mkdirSync(dataDir, { recursive: true });
 
