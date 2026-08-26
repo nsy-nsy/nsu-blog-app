@@ -1,5 +1,5 @@
 const AUTH_TOKEN_KEY = "nsu-blog-token-v1";
-const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 잘못되었습니다.";
+const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 올바르지 않습니다.";
 
 export type AuthUser = {
   username: string;
