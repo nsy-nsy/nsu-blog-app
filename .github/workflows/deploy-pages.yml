@@ -34,8 +34,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_SITE_URL: https://nsy-nsy.github.io/nsu-blog-app
-          VITE_BASE_PATH: /nsu-blog-app/
+          VITE_SITE_URL: https://dysco.co.kr
+          VITE_BASE_PATH: /
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
