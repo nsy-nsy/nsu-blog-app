@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { starterPosts } from "../src/posts.ts";
 
-const siteUrl = (process.env.VITE_SITE_URL ?? "https://nsy-nsy.github.io/nsu-blog-app").replace(/\/$/, "");
+const siteUrl = (process.env.VITE_SITE_URL ?? "https://dysco.co.kr").replace(/\/$/, "");
 const sitePath = new URL(siteUrl).pathname.replace(/\/$/, "");
 const basePath = (process.env.VITE_BASE_PATH ?? sitePath).replace(/\/$/, "");
 const publicDir = resolve("public");
