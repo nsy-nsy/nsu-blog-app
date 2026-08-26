@@ -1,4 +1,4 @@
-export type Category = "일상기록" | "생활정보" | "컴퓨터" | "윈도우" | "블로그운영" | "리뷰";
+export type Category = "리뷰" | "여행" | "일상" | "컴퓨터";
 export type Theme = "light" | "dark";
 
 export type Post = {
@@ -8,12 +8,20 @@ export type Post = {
   excerpt: string;
   body: string;
   images?: string[];
+  media?: PostMedia[];
   createdAt: string;
   readMinutes: number;
   tags: string[];
   searchIntent: string;
 };
 
-export type PostDraft = Pick<Post, "title" | "category" | "excerpt" | "body" | "tags">;
+export type PostMedia = {
+  id: string;
+  type: "image" | "video";
+  src: string;
+  name: string;
+};
+
+export type PostDraft = Pick<Post, "title" | "category" | "excerpt" | "body" | "tags" | "media">;
 
 export type Page = "home" | "posts" | "detail" | "write" | "login";
