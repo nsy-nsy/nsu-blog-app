@@ -17,11 +17,26 @@ import { pagePath, routeToState, updateBrowserUrl } from "./utils/routing";
 import { updatePageSeo } from "./utils/seo";
 import { getSystemTheme } from "./utils/theme";
 
-const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 잘못되었습니다.";
+const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 올바르지 않습니다.";
+const BODY_MAX_LENGTH = 30_000;
+
+function normalizePostCategory(post: Post): Post {
+  const category = post.category as string;
+
+  if (category === "생활정보" || category === "윈도우" || category === "블로그운영") {
+    return { ...post, category: "컴퓨터" };
+  }
+
+  if (category === "일상기록") {
+    return { ...post, category: "일상" };
+  }
+
+  return post;
+}
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
-  const [posts, setPosts] = useState<Post[]>(() => safeRead(STORAGE_KEY, starterPosts));
+  const [posts, setPosts] = useState<Post[]>(() => safeRead<Post[]>(STORAGE_KEY, starterPosts).map(normalizePostCategory));
   const initialRoute = routeToState(posts);
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -142,12 +157,13 @@ export default function App() {
       return;
     }
 
-    const body = cleanText(draft.body, 9000);
+    const body = cleanText(draft.body, BODY_MAX_LENGTH);
     const nextDraft: PostDraft = {
       title: cleanText(draft.title, 90),
       category: draft.category,
       excerpt: cleanText(draft.excerpt, 220),
       body,
+      media: draft.media ?? [],
       tags: parseTags(tagInput),
     };
 
@@ -197,7 +213,7 @@ export default function App() {
       setLoginId("");
       setLoginPasscode("");
       setLoginMessage("");
-      navigate("write");
+      navigate("home");
     } catch {
       clearAuth();
       setAuthUser(null);
