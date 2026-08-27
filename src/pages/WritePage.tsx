@@ -14,6 +14,7 @@ type WritePageProps = {
   onDraftChange: (draft: PostDraft) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   setTagInput: (tags: string) => void;
+  submitLabel?: string;
   tagInput: string;
 };
 
@@ -33,7 +34,7 @@ function fileToMedia(file: File): Promise<PostMedia> {
   });
 }
 
-export function WritePage({ categories, draft, message, onDraftChange, onSubmit, setTagInput, tagInput }: WritePageProps) {
+export function WritePage({ categories, draft, message, onDraftChange, onSubmit, setTagInput, submitLabel = "글 저장", tagInput }: WritePageProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -308,7 +309,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-bold text-zinc-600 dark:text-zinc-400">{message || `본문은 최소 120자 이상, 최대 ${BODY_MAX_LENGTH.toLocaleString()}자까지 작성할 수 있습니다.`}</p>
           <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white dark:bg-white dark:text-zinc-950" type="submit">
-            글 저장
+            {submitLabel}
           </button>
         </div>
       </form>
