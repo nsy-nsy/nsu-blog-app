@@ -128,7 +128,7 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
         <p className="mt-4 max-w-3xl text-[15px] leading-7 text-zinc-600 dark:text-zinc-300">{post.excerpt}</p>
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-zinc-500">
           <span>
-            <em className="font-serif italic">by</em> <strong className="text-zinc-800 dark:text-zinc-200">루이</strong>
+            <em className="font-serif italic">by</em> <strong className="text-zinc-800 dark:text-zinc-200">세웅</strong>
           </span>
           <span className="inline-flex gap-4">
             <span>{formatDate(post.createdAt)}</span>
