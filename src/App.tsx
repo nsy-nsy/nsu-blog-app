@@ -44,6 +44,7 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<Category | "전체">("전체");
   const [selectedId, setSelectedId] = useState(initialRoute.selectedId);
   const [draft, setDraft] = useState<PostDraft>(emptyDraft);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [message, setMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -127,6 +128,13 @@ export default function App() {
       return;
     }
 
+    if (nextPage === "write" && isLoggedIn) {
+      setDraft(emptyDraft);
+      setTagInput("");
+      setEditingPostId(null);
+      setMessage("");
+    }
+
     moveToPage(nextPage, pagePath(nextPage, selectedPost));
   }
 
@@ -172,6 +180,30 @@ export default function App() {
       return;
     }
 
+    if (editingPostId) {
+      const existingPost = posts.find((post) => post.id === editingPostId);
+      const nextPosts = posts.map((post) =>
+        post.id === editingPostId
+          ? {
+              ...post,
+              ...nextDraft,
+              images: undefined,
+              readMinutes: estimateReadMinutes(body),
+              searchIntent: post.searchIntent || "직접 작성한 개인 블로그 글",
+            }
+          : post,
+      );
+
+      persist(nextPosts);
+      setDraft(emptyDraft);
+      setTagInput("");
+      setEditingPostId(null);
+      setSelectedId(existingPost?.id ?? editingPostId);
+      setMessage("글이 수정되었습니다.");
+      moveToPage("detail", pagePath("detail", existingPost));
+      return;
+    }
+
     const post: Post = {
       ...nextDraft,
       id: makeId(),
@@ -193,6 +225,34 @@ export default function App() {
     const nextPosts = posts.filter((post) => post.id !== id);
     persist(nextPosts);
     setSelectedId(nextPosts[0]?.id ?? "");
+  }
+
+  function handleEdit(id: string) {
+    if (!isLoggedIn) return;
+
+    const post = posts.find((item) => item.id === id);
+    if (!post) return;
+
+    setEditingPostId(id);
+    setDraft({
+      title: post.title,
+      category: post.category,
+      excerpt: post.excerpt,
+      body: post.body,
+      tags: post.tags,
+      media:
+        post.media ??
+        post.images?.map((image, index) => ({
+          id: `image-${index}`,
+          name: `${post.title} 사진 ${index + 1}`,
+          src: image,
+          type: "image" as const,
+        })) ??
+        [],
+    });
+    setTagInput(post.tags.join(", "));
+    setMessage("글을 수정한 뒤 저장하세요.");
+    moveToPage("write", "/write");
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -258,7 +318,7 @@ export default function App() {
           setQuery={setQuery}
         />
       )}
-      {page === "detail" && <DetailPage isLoggedIn={isLoggedIn} onBack={() => navigate("posts")} onDelete={handleDelete} post={selectedPost} />}
+      {page === "detail" && <DetailPage isLoggedIn={isLoggedIn} onBack={() => navigate("posts")} onDelete={handleDelete} onEdit={handleEdit} post={selectedPost} />}
       {page === "login" && authChecking && <AuthStatusCard message="로그인 상태를 확인 중입니다." />}
       {page === "login" && !authChecking && !isLoggedIn && (
         <LoginPage
@@ -280,6 +340,7 @@ export default function App() {
           onDraftChange={setDraft}
           onSubmit={handleSubmit}
           setTagInput={setTagInput}
+          submitLabel={editingPostId ? "수정 저장" : "글 저장"}
           tagInput={tagInput}
         />
       )}
