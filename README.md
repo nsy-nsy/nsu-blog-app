@@ -11,9 +11,9 @@ npm run dev:api
 npm run dev:web
 ```
 
-`dev:api`는 백엔드 인증 서버를 `http://127.0.0.1:4175`에서 실행합니다.
+`dev:api`는 백엔드 API 서버를 `http://127.0.0.1:4175`에서 실행합니다.
 `dev:web`은 Vite 프론트엔드를 실행하고 `/api` 요청을 백엔드로 프록시합니다.
-`db:setup`은 `.env`의 MySQL 접속 정보로 `MYSQL_DATABASE` 데이터베이스와 `admin_auth` 테이블을 생성합니다.
+`db:setup`은 `.env`의 MySQL 접속 정보로 `MYSQL_DATABASE` 데이터베이스와 `admin_auth`, `posts` 테이블을 생성합니다. 첫 실행 때 기본 글도 DB에 넣습니다.
 
 보안 관련 설정은 `.env`에 둡니다. 예시는 `.env.example`을 참고하세요. `.env`와 `server/.env`는 GitHub에 올리지 않습니다.
 
@@ -21,9 +21,10 @@ npm run dev:web
 
 - 글 작성, 목록, 상세 보기
 - 카테고리 필터
-- localStorage 저장
-- Node 백엔드 로그인 API
+- 백엔드 API 저장 또는 localStorage fallback
+- Node + TypeScript 백엔드 API
 - MySQL 기반 관리자 인증 저장소
+- MySQL 기반 게시글 CRUD 저장소
 - 서버 저장 PBKDF2 비밀번호 해시
 - 세션 토큰 기반 글쓰기 접근 제어
 - `dangerouslySetInnerHTML` 미사용
@@ -35,6 +36,28 @@ npm run dev:web
 
 기본 아이디는 `seung`입니다. 첫 로그인 때 입력한 8자 이상 비밀번호가 관리자 비밀번호로 설정됩니다.
 비밀번호 원문은 저장하지 않고 MySQL `admin_auth` 테이블에 PBKDF2 해시로 저장됩니다. `server/data/`와 `.env`는 Git에 커밋되지 않습니다.
+
+## 백엔드 API
+
+```text
+GET    /api/health
+POST   /api/auth/login
+GET    /api/auth/me
+GET    /api/posts
+GET    /api/posts/:id
+POST   /api/posts
+PUT    /api/posts/:id
+DELETE /api/posts/:id
+```
+
+글 생성, 수정, 삭제는 로그인 토큰이 있어야 합니다. 프론트는 `VITE_API_BASE_URL`이 설정되어 있으면 해당 API 서버를 사용하고, 없으면 GitHub Pages에서도 깨지지 않도록 브라우저 저장소를 fallback으로 사용합니다.
+
+실제 배포 시에는 백엔드 서버 환경 변수에 `CORS_ORIGIN=https://dysco.co.kr`를 넣고, 프론트 빌드 환경 변수에 배포된 API 주소를 넣습니다.
+
+```bash
+$env:VITE_API_BASE_URL="https://api.example.com"
+npm run build
+```
 
 ## 애드센스 연결
 
