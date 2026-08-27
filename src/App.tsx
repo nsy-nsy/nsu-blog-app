@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPostFromApi, deletePostFromApi, fetchPostsFromApi, hasRemoteApi, updatePostFromApi } from "./api";
 import { clearAuth, fetchCurrentUser, hasStoredToken, login, type AuthUser } from "./auth";
 import { AuthStatusCard } from "./components/AuthStatusCard";
 import { Footer } from "./components/Footer";
@@ -62,6 +63,20 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  useEffect(() => {
+    if (!hasRemoteApi()) return;
+
+    fetchPostsFromApi()
+      .then((apiPosts) => {
+        if (apiPosts.length > 0) {
+          setPosts(apiPosts.map(normalizePostCategory));
+        }
+      })
+      .catch(() => {
+        setMessage("백엔드 글 목록을 불러오지 못해 브라우저 저장 글을 표시합니다.");
+      });
+  }, []);
 
   useEffect(() => {
     const onPopState = () => {
@@ -151,12 +166,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function persist(nextPosts: Post[]) {
+  function persistLocal(nextPosts: Post[]) {
     setPosts(nextPosts);
     safeWrite(STORAGE_KEY, nextPosts);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!isLoggedIn) {
@@ -182,29 +197,38 @@ export default function App() {
 
     if (editingPostId) {
       const existingPost = posts.find((post) => post.id === editingPostId);
-      const nextPosts = posts.map((post) =>
-        post.id === editingPostId
-          ? {
-              ...post,
-              ...nextDraft,
-              images: undefined,
-              readMinutes: estimateReadMinutes(body),
-              searchIntent: post.searchIntent || "직접 작성한 개인 블로그 글",
-            }
-          : post,
-      );
+      if (!existingPost) return;
 
-      persist(nextPosts);
+      const updatedPost: Post = {
+        ...existingPost,
+        ...nextDraft,
+        images: undefined,
+        readMinutes: estimateReadMinutes(body),
+        searchIntent: existingPost.searchIntent || "직접 작성한 개인 블로그 글",
+      };
+
+      let savedPost = updatedPost;
+      if (hasRemoteApi()) {
+        try {
+          savedPost = await updatePostFromApi(editingPostId, updatedPost);
+        } catch (error) {
+          setMessage(error instanceof Error ? error.message : "글 수정에 실패했습니다.");
+          return;
+        }
+      }
+
+      const nextPosts = posts.map((post) => (post.id === editingPostId ? savedPost : post));
+      persistLocal(nextPosts);
       setDraft(emptyDraft);
       setTagInput("");
       setEditingPostId(null);
-      setSelectedId(existingPost?.id ?? editingPostId);
+      setSelectedId(savedPost.id);
       setMessage("글이 수정되었습니다.");
-      moveToPage("detail", pagePath("detail", existingPost));
+      moveToPage("detail", pagePath("detail", savedPost));
       return;
     }
 
-    const post: Post = {
+    let post: Post = {
       ...nextDraft,
       id: makeId(),
       createdAt: new Date().toISOString(),
@@ -212,7 +236,16 @@ export default function App() {
       searchIntent: "직접 작성한 개인 블로그 글",
     };
 
-    persist([post, ...posts].slice(0, 80));
+    if (hasRemoteApi()) {
+      try {
+        post = await createPostFromApi(post);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "글 저장에 실패했습니다.");
+        return;
+      }
+    }
+
+    persistLocal([post, ...posts].slice(0, 80));
     setDraft(emptyDraft);
     setTagInput("");
     setSelectedId(post.id);
@@ -220,10 +253,20 @@ export default function App() {
     navigate("detail");
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!isLoggedIn) return;
+
+    if (hasRemoteApi()) {
+      try {
+        await deletePostFromApi(id);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "글 삭제에 실패했습니다.");
+        return;
+      }
+    }
+
     const nextPosts = posts.filter((post) => post.id !== id);
-    persist(nextPosts);
+    persistLocal(nextPosts);
     setSelectedId(nextPosts[0]?.id ?? "");
   }
 

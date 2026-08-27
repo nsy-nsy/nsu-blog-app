@@ -3,6 +3,7 @@ const LOCAL_AUTH_HASH_KEY = "nsu-blog-local-auth-hash-v1";
 const LOCAL_AUTH_USER_KEY = "nsu-blog-local-auth-user-v1";
 const DEFAULT_ADMIN_USER = "seung";
 const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 올바르지 않습니다.";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 export type AuthUser = {
   username: string;
@@ -22,7 +23,11 @@ type LocalPasswordHash = {
 };
 
 function isStaticHosting() {
-  return window.location.hostname === "dysco.co.kr" || window.location.hostname.endsWith(".github.io");
+  return !API_BASE_URL && (window.location.hostname === "dysco.co.kr" || window.location.hostname.endsWith(".github.io"));
+}
+
+function apiUrl(path: string) {
+  return `${API_BASE_URL}${path}`;
 }
 
 function getLocalAdminUser() {
@@ -134,7 +139,7 @@ export async function fetchCurrentUser() {
     return token.startsWith("local:") ? ({ username } satisfies AuthUser) : null;
   }
 
-  const response = await fetch("/api/auth/me", {
+  const response = await fetch(apiUrl("/api/auth/me"), {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -159,7 +164,7 @@ export async function login(username: string, password: string) {
 
   let response: Response;
   try {
-    response = await fetch("/api/auth/login", {
+    response = await fetch(apiUrl("/api/auth/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ username, password }),
