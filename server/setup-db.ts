@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import { mysqlConfig } from "./config.ts";
+import { starterPosts } from "../src/posts.ts";
 
 function escapeIdentifier(value: string) {
   return `\`${value.replaceAll("`", "``")}\``;
@@ -29,6 +30,50 @@ try {
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS posts (
+      id VARCHAR(160) NOT NULL PRIMARY KEY,
+      title VARCHAR(120) NOT NULL,
+      category VARCHAR(24) NOT NULL,
+      excerpt VARCHAR(260) NOT NULL,
+      body MEDIUMTEXT NOT NULL,
+      images_json JSON NULL,
+      media_json JSON NULL,
+      created_at DATETIME NOT NULL,
+      read_minutes INT NOT NULL DEFAULT 1,
+      tags_json JSON NOT NULL,
+      search_intent VARCHAR(260) NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_posts_created_at (created_at),
+      INDEX idx_posts_category (category)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  const [rows] = await connection.query("SELECT COUNT(*) AS count FROM posts");
+  const [{ count }] = rows as Array<{ count: number }>;
+
+  if (count === 0) {
+    for (const post of starterPosts) {
+      await connection.execute(
+        `INSERT INTO posts
+          (id, title, category, excerpt, body, images_json, media_json, created_at, read_minutes, tags_json, search_intent)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          post.id,
+          post.title,
+          post.category,
+          post.excerpt,
+          post.body,
+          JSON.stringify(post.images ?? []),
+          JSON.stringify(post.media ?? []),
+          new Date(post.createdAt),
+          post.readMinutes,
+          JSON.stringify(post.tags),
+          post.searchIntent,
+        ],
+      );
+    }
+  }
 
   console.log(`MySQL database ready: ${mysqlConfig.database}`);
 } catch (error) {

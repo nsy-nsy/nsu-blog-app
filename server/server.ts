@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getAdminAuth, saveAdminAuth, type PasswordHash } from "./auth-store.ts";
 import { apiConfig } from "./config.ts";
 import { pingDatabase } from "./db.ts";
+import { createPost, deletePost, getPost, listPosts, updatePost, type BlogPost } from "./posts-store.ts";
 
 type TokenPayload = {
   sub: string;
@@ -18,6 +19,8 @@ const dataDir = join(__dirname, "data");
 const secretFile = join(dataDir, "session-secret.txt");
 const { port, adminUser, tokenMaxAgeSeconds } = apiConfig;
 const invalidLoginMessage = "아이디나 비밀번호가 올바르지 않습니다.";
+const bodyMaxBytes = 80 * 1024 * 1024;
+const validCategories = new Set(["리뷰", "여행", "일상", "컴퓨터"]);
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -81,6 +84,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown) {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
+    "Access-Control-Allow-Origin": apiConfig.corsOrigin,
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
   response.end(JSON.stringify(body));
 }
@@ -91,12 +97,79 @@ async function readBody(request: IncomingMessage) {
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > 64 * 1024) throw new Error("Payload too large");
+    if (size > bodyMaxBytes) throw new Error("Payload too large");
     chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw) return {};
   return JSON.parse(raw) as Record<string, unknown>;
+}
+
+function cleanText(value: unknown, maxLength: number) {
+  return String(value ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function readMinutes(body: string) {
+  const words = body.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 220));
+}
+
+function parseStringArray(value: unknown, maxItems: number, maxLength: number) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => cleanText(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function parseMedia(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const media = item as Record<string, unknown>;
+      const type = media.type === "video" ? "video" : "image";
+      const src = cleanText(media.src, 20_000_000);
+      const name = cleanText(media.name, 160);
+      const id = cleanText(media.id, 160);
+      return id && src ? { id, type, src, name: name || id } : null;
+    })
+    .filter((item): item is NonNullable<ReturnType<typeof parseMedia>[number]> => Boolean(item))
+    .slice(0, 12);
+}
+
+function parsePost(body: Record<string, unknown>, existing?: BlogPost): BlogPost {
+  const title = cleanText(body.title, 90);
+  const category = cleanText(body.category, 24);
+  const excerpt = cleanText(body.excerpt, 220);
+  const content = cleanText(body.body, 30_000);
+  const tags = parseStringArray(body.tags, 12, 32);
+  const media = parseMedia(body.media);
+  const images = parseStringArray(body.images, 40, 1000);
+
+  if (!title || !excerpt || content.length < 120 || !validCategories.has(category)) {
+    throw new Error("Invalid post");
+  }
+
+  return {
+    id: existing?.id ?? cleanText(body.id, 160),
+    title,
+    category: category as BlogPost["category"],
+    excerpt,
+    body: content,
+    images: images.length > 0 ? images : undefined,
+    media: media.length > 0 ? media : undefined,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    readMinutes: readMinutes(content),
+    tags,
+    searchIntent: cleanText(body.searchIntent, 240) || existing?.searchIntent || "직접 작성한 개인 블로그 글",
+  };
+}
+
+function requireAdmin(request: IncomingMessage) {
+  return verifyToken(getBearerToken(request));
 }
 
 function getBearerToken(request: IncomingMessage) {
@@ -107,6 +180,11 @@ function getBearerToken(request: IncomingMessage) {
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
+
+    if (request.method === "OPTIONS") {
+      sendJson(response, 204, {});
+      return;
+    }
 
     if (request.method === "GET" && url.pathname === "/api/health") {
       try {
@@ -146,6 +224,62 @@ const server = createServer(async (request, response) => {
       const now = Math.floor(Date.now() / 1000);
       const token = signToken({ sub: adminUser, iat: now, exp: now + tokenMaxAgeSeconds });
       sendJson(response, 200, { token, user: adminUser, expiresIn: tokenMaxAgeSeconds });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/posts") {
+      sendJson(response, 200, { posts: await listPosts() });
+      return;
+    }
+
+    const postMatch = url.pathname.match(/^\/api\/posts\/([^/]+)$/);
+
+    if (request.method === "GET" && postMatch) {
+      const post = await getPost(decodeURIComponent(postMatch[1]));
+      sendJson(response, post ? 200 : 404, post ? { post } : { message: "Post not found" });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/posts") {
+      if (!requireAdmin(request)) {
+        sendJson(response, 401, { message: "Unauthorized" });
+        return;
+      }
+
+      const body = await readBody(request);
+      const post = parsePost(body);
+      await createPost(post);
+      sendJson(response, 201, { post });
+      return;
+    }
+
+    if (request.method === "PUT" && postMatch) {
+      if (!requireAdmin(request)) {
+        sendJson(response, 401, { message: "Unauthorized" });
+        return;
+      }
+
+      const id = decodeURIComponent(postMatch[1]);
+      const existing = await getPost(id);
+      if (!existing) {
+        sendJson(response, 404, { message: "Post not found" });
+        return;
+      }
+
+      const post = parsePost(await readBody(request), existing);
+      const updated = await updatePost(id, post);
+      sendJson(response, updated ? 200 : 404, updated ? { post } : { message: "Post not found" });
+      return;
+    }
+
+    if (request.method === "DELETE" && postMatch) {
+      if (!requireAdmin(request)) {
+        sendJson(response, 401, { message: "Unauthorized" });
+        return;
+      }
+
+      const deleted = await deletePost(decodeURIComponent(postMatch[1]));
+      sendJson(response, deleted ? 200 : 404, deleted ? { ok: true } : { message: "Post not found" });
       return;
     }
 

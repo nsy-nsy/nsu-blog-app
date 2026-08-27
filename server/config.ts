@@ -14,6 +14,7 @@ export const apiConfig = {
   port: readNumber("API_PORT", 4175),
   adminUser: readRequired("ADMIN_USER", "seung").toLowerCase(),
   tokenMaxAgeSeconds: readNumber("TOKEN_MAX_AGE_SECONDS", 60 * 60 * 8),
+  corsOrigin: readRequired("CORS_ORIGIN", "http://127.0.0.1:5173"),
 };
 
 export const mysqlConfig = {
