@@ -1,4 +1,4 @@
-import { Tag } from "lucide-react";
+import { Pencil, Tag, Trash2 } from "lucide-react";
 import { ASSET_BASE } from "../config";
 import type { Post } from "../types";
 import { formatDate } from "../utils/blog";
@@ -100,7 +100,19 @@ function RenderBody({ post }: { post: Post }) {
   );
 }
 
-export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn: boolean; onBack: () => void; onDelete: (id: string) => void; post?: Post }) {
+export function DetailPage({
+  isLoggedIn,
+  onBack,
+  onDelete,
+  onEdit,
+  post,
+}: {
+  isLoggedIn: boolean;
+  onBack: () => void;
+  onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
+  post?: Post;
+}) {
   if (!post) {
     return (
       <section className="mx-auto grid max-w-7xl grid-cols-12 px-5 py-14 md:px-8">
@@ -113,8 +125,6 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
       </section>
     );
   }
-
-  const isUserPost = !post.id.includes("-");
 
   return (
     <article className="mx-auto max-w-3xl px-5 py-10 md:px-8 md:py-16">
@@ -174,17 +184,29 @@ export function DetailPage({ isLoggedIn, onBack, onDelete, post }: { isLoggedIn:
       <footer className="mt-12 rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">Search intent</p>
         <p className="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{post.searchIntent}</p>
-        {isLoggedIn && isUserPost && (
-          <button
-            className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300"
-            type="button"
-            onClick={() => {
-              onDelete(post.id);
-              onBack();
-            }}
-          >
-            삭제
-          </button>
+        {isLoggedIn && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black text-zinc-800 transition hover:border-emerald-500 hover:text-emerald-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-emerald-400 dark:hover:text-emerald-300"
+              type="button"
+              onClick={() => onEdit(post.id)}
+            >
+              <Pencil size={15} />
+              수정
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-100 dark:border-red-950 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70"
+              type="button"
+              onClick={() => {
+                if (!window.confirm("이 게시글을 삭제할까요?")) return;
+                onDelete(post.id);
+                onBack();
+              }}
+            >
+              <Trash2 size={15} />
+              삭제
+            </button>
+          </div>
         )}
       </footer>
     </article>
