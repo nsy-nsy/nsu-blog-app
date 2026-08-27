@@ -17,10 +17,20 @@ type TokenPayload = {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "data");
 const secretFile = join(dataDir, "session-secret.txt");
-const { port, adminUser, tokenMaxAgeSeconds } = apiConfig;
+const { host, port, adminUser, tokenMaxAgeSeconds } = apiConfig;
 const invalidLoginMessage = "아이디나 비밀번호가 올바르지 않습니다.";
 const bodyMaxBytes = 80 * 1024 * 1024;
 const validCategories = new Set(["리뷰", "여행", "일상", "컴퓨터"]);
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -79,16 +89,27 @@ function verifyToken(token: string) {
   }
 }
 
-function sendJson(response: ServerResponse, status: number, body: unknown) {
+function getCorsOrigin(request: IncomingMessage) {
+  const origin = request.headers.origin;
+  if (!origin) return apiConfig.corsOrigin;
+  return origin === apiConfig.corsOrigin ? origin : "";
+}
+
+function sendJson(request: IncomingMessage, response: ServerResponse, status: number, body: unknown) {
+  const corsOrigin = getCorsOrigin(request);
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
-    "Access-Control-Allow-Origin": apiConfig.corsOrigin,
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Vary": "Origin",
+    ...(corsOrigin ? { "Access-Control-Allow-Origin": corsOrigin } : {}),
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   });
-  response.end(JSON.stringify(body));
+  response.end(status === 204 ? undefined : JSON.stringify(body));
 }
 
 async function readBody(request: IncomingMessage) {
@@ -97,12 +118,16 @@ async function readBody(request: IncomingMessage) {
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += buffer.length;
-    if (size > bodyMaxBytes) throw new Error("Payload too large");
+    if (size > bodyMaxBytes) throw new ApiError(413, "Payload too large");
     chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw) return {};
-  return JSON.parse(raw) as Record<string, unknown>;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new ApiError(400, "Invalid JSON");
+  }
 }
 
 function cleanText(value: unknown, maxLength: number) {
@@ -134,10 +159,23 @@ function parseMedia(value: unknown) {
       const src = cleanText(media.src, 20_000_000);
       const name = cleanText(media.name, 160);
       const id = cleanText(media.id, 160);
-      return id && src ? { id, type, src, name: name || id } : null;
+      const validSrc = src.startsWith("data:image/") || src.startsWith("data:video/") || src.startsWith("posts/") || src.startsWith("https://");
+      return id && validSrc ? { id, type, src, name: name || id } : null;
     })
     .filter((item): item is NonNullable<ReturnType<typeof parseMedia>[number]> => Boolean(item))
     .slice(0, 12);
+}
+
+function slugify(value: string) {
+  const slug = value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90);
+  return slug || `post-${Date.now().toString(36)}`;
 }
 
 function parsePost(body: Record<string, unknown>, existing?: BlogPost): BlogPost {
@@ -150,11 +188,11 @@ function parsePost(body: Record<string, unknown>, existing?: BlogPost): BlogPost
   const images = parseStringArray(body.images, 40, 1000);
 
   if (!title || !excerpt || content.length < 120 || !validCategories.has(category)) {
-    throw new Error("Invalid post");
+    throw new ApiError(400, "제목, 요약, 본문 120자 이상, 올바른 카테고리를 입력해주세요.");
   }
 
   return {
-    id: existing?.id ?? cleanText(body.id, 160),
+    id: existing?.id ?? slugify(cleanText(body.id, 160) || title),
     title,
     category: category as BlogPost["category"],
     excerpt,
@@ -172,6 +210,27 @@ function requireAdmin(request: IncomingMessage) {
   return verifyToken(getBearerToken(request));
 }
 
+function getClientKey(request: IncomingMessage) {
+  return String(request.headers["x-forwarded-for"] ?? request.socket.remoteAddress ?? "unknown").split(",")[0].trim();
+}
+
+function checkLoginRateLimit(request: IncomingMessage) {
+  const key = getClientKey(request);
+  const now = Date.now();
+  const current = loginAttempts.get(key);
+  if (!current || current.resetAt < now) {
+    loginAttempts.set(key, { count: 1, resetAt: now + 15 * 60 * 1000 });
+    return true;
+  }
+
+  current.count += 1;
+  return current.count <= 10;
+}
+
+function clearLoginRateLimit(request: IncomingMessage) {
+  loginAttempts.delete(getClientKey(request));
+}
+
 function getBearerToken(request: IncomingMessage) {
   const authorization = request.headers.authorization ?? "";
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
@@ -182,33 +241,38 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host}`);
 
     if (request.method === "OPTIONS") {
-      sendJson(response, 204, {});
+      sendJson(request, response, 204, {});
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/health") {
       try {
         await pingDatabase();
-        sendJson(response, 200, { ok: true, database: "ok" });
+        sendJson(request, response, 200, { ok: true, database: "ok" });
       } catch {
-        sendJson(response, 200, { ok: true, database: "unavailable" });
+        sendJson(request, response, 200, { ok: true, database: "unavailable" });
       }
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/auth/me") {
       const payload = verifyToken(getBearerToken(request));
-      sendJson(response, payload ? 200 : 401, { authenticated: Boolean(payload), user: payload?.sub ?? null });
+      sendJson(request, response, payload ? 200 : 401, { authenticated: Boolean(payload), user: payload?.sub ?? null });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/auth/login") {
+      if (!checkLoginRateLimit(request)) {
+        sendJson(request, response, 429, { message: "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요." });
+        return;
+      }
+
       const body = await readBody(request);
       const username = String(body.username ?? "").trim().toLowerCase();
       const password = String(body.password ?? "");
 
       if (username !== adminUser || password.length < 8) {
-        sendJson(response, 401, { message: invalidLoginMessage });
+        sendJson(request, response, 401, { message: invalidLoginMessage });
         return;
       }
 
@@ -217,18 +281,19 @@ const server = createServer(async (request, response) => {
         const passwordHash = hashPassword(password);
         await saveAdminAuth(adminUser, passwordHash);
       } else if (auth.username !== adminUser || !verifyPassword(password, auth.passwordHash)) {
-        sendJson(response, 401, { message: invalidLoginMessage });
+        sendJson(request, response, 401, { message: invalidLoginMessage });
         return;
       }
 
+      clearLoginRateLimit(request);
       const now = Math.floor(Date.now() / 1000);
       const token = signToken({ sub: adminUser, iat: now, exp: now + tokenMaxAgeSeconds });
-      sendJson(response, 200, { token, user: adminUser, expiresIn: tokenMaxAgeSeconds });
+      sendJson(request, response, 200, { token, user: adminUser, expiresIn: tokenMaxAgeSeconds });
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/posts") {
-      sendJson(response, 200, { posts: await listPosts() });
+      sendJson(request, response, 200, { posts: await listPosts() });
       return;
     }
 
@@ -236,60 +301,68 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && postMatch) {
       const post = await getPost(decodeURIComponent(postMatch[1]));
-      sendJson(response, post ? 200 : 404, post ? { post } : { message: "Post not found" });
+      sendJson(request, response, post ? 200 : 404, post ? { post } : { message: "Post not found" });
       return;
     }
 
     if (request.method === "POST" && url.pathname === "/api/posts") {
       if (!requireAdmin(request)) {
-        sendJson(response, 401, { message: "Unauthorized" });
+        sendJson(request, response, 401, { message: "Unauthorized" });
         return;
       }
 
       const body = await readBody(request);
       const post = parsePost(body);
+      if (await getPost(post.id)) {
+        post.id = `${post.id}-${randomBytes(3).toString("hex")}`;
+      }
       await createPost(post);
-      sendJson(response, 201, { post });
+      sendJson(request, response, 201, { post });
       return;
     }
 
     if (request.method === "PUT" && postMatch) {
       if (!requireAdmin(request)) {
-        sendJson(response, 401, { message: "Unauthorized" });
+        sendJson(request, response, 401, { message: "Unauthorized" });
         return;
       }
 
       const id = decodeURIComponent(postMatch[1]);
       const existing = await getPost(id);
       if (!existing) {
-        sendJson(response, 404, { message: "Post not found" });
+        sendJson(request, response, 404, { message: "Post not found" });
         return;
       }
 
       const post = parsePost(await readBody(request), existing);
       const updated = await updatePost(id, post);
-      sendJson(response, updated ? 200 : 404, updated ? { post } : { message: "Post not found" });
+      sendJson(request, response, updated ? 200 : 404, updated ? { post } : { message: "Post not found" });
       return;
     }
 
     if (request.method === "DELETE" && postMatch) {
       if (!requireAdmin(request)) {
-        sendJson(response, 401, { message: "Unauthorized" });
+        sendJson(request, response, 401, { message: "Unauthorized" });
         return;
       }
 
       const deleted = await deletePost(decodeURIComponent(postMatch[1]));
-      sendJson(response, deleted ? 200 : 404, deleted ? { ok: true } : { message: "Post not found" });
+      sendJson(request, response, deleted ? 200 : 404, deleted ? { ok: true } : { message: "Post not found" });
       return;
     }
 
-    sendJson(response, 404, { message: "Not found" });
+    sendJson(request, response, 404, { message: "Not found" });
   } catch (error) {
     console.error(error);
-    sendJson(response, 500, { message: "Server error" });
+    if (error instanceof ApiError) {
+      sendJson(request, response, error.status, { message: error.message });
+      return;
+    }
+
+    sendJson(request, response, 500, { message: "Server error" });
   }
 });
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`API server running at http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  console.log(`API server running at http://${host}:${port}`);
 });
