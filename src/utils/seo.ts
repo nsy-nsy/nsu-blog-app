@@ -26,7 +26,7 @@ export function updatePageSeo(page: Page, selectedPost?: Post) {
       ? selectedPost.excerpt
       : page === "posts"
         ? "신발 리뷰, 일상 기록, 생활 정보, 컴퓨터 팁을 모아둔 글목록입니다."
-        : "루이의 신발 리뷰와 일상 기록, 생활 정보, 컴퓨터 팁을 차분하게 남기는 개인 블로그입니다.";
+        : "세웅의 신발 리뷰와 일상 기록, 생활 정보, 컴퓨터 팁을 차분하게 남기는 개인 블로그입니다.";
   const path = pagePath(page, selectedPost);
   const url = `${SITE_URL}${path}`;
   const robots = page === "login" || page === "write" ? "noindex, nofollow" : "index, follow, max-image-preview:large";
