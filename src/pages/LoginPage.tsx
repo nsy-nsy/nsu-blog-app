@@ -18,7 +18,7 @@ export function LoginPage({ loginId, loginMessage, loginPasscode, loginPending, 
         <p className="text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-300">Owner Access</p>
         <h1 className="mt-3 text-3xl font-black leading-tight md:text-4xl">로그인 후 글쓰기</h1>
         <p className="mt-5 max-w-md text-[15px] leading-7 text-zinc-650 dark:text-slate-300">
-          글 작성은 인증된 사용자만 사용할 수 있습니다. 아이디와 비밀번호는 서버에서 검증되며, 실패 이유는 외부에 자세히 노출하지 않습니다.
+          글 작성은 인증된 사용자만 사용할 수 있습니다. 아이디와 비밀번호는 이 브라우저에서 확인되며, 실패 이유는 외부에 자세히 노출하지 않습니다.
         </p>
         <div className="mt-7 inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-extrabold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">
           <ShieldCheck size={15} />
