@@ -13,6 +13,7 @@ export function routeToState(posts: Post[]) {
 
   if (path.endsWith("/posts")) return { page: "posts" as Page, selectedId: posts[0]?.id ?? "" };
   if (path.endsWith("/write")) return { page: "write" as Page, selectedId: posts[0]?.id ?? "" };
+  if (path.endsWith("/admin")) return { page: "admin" as Page, selectedId: posts[0]?.id ?? "" };
   if (path.endsWith("/login")) return { page: "login" as Page, selectedId: posts[0]?.id ?? "" };
   return { page: "home" as Page, selectedId: posts[0]?.id ?? "" };
 }
@@ -21,6 +22,7 @@ export function pagePath(page: Page, post?: Post) {
   if (page === "posts") return "/posts";
   if (page === "detail" && post) return `/posts/${encodeURIComponent(post.id)}`;
   if (page === "write") return "/write";
+  if (page === "admin") return "/admin";
   if (page === "login") return "/login";
   return "/";
 }
