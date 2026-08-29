@@ -24,4 +24,28 @@ export type PostMedia = {
 
 export type PostDraft = Pick<Post, "title" | "category" | "excerpt" | "body" | "tags" | "media">;
 
-export type Page = "home" | "posts" | "detail" | "write" | "login";
+export type HomeFeature = {
+  id: string;
+  title: string;
+  body: string;
+  visible: boolean;
+};
+
+export type HomeSectionId = "hero" | "features" | "latest";
+
+export type HomeSettings = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  primaryButtonLabel: string;
+  secondaryButtonLabel: string;
+  heroImage: string;
+  heroImageAlt: string;
+  features: HomeFeature[];
+  latestEyebrow: string;
+  latestTitle: string;
+  latestCount: number;
+  sectionOrder: HomeSectionId[];
+};
+
+export type Page = "home" | "posts" | "detail" | "write" | "login" | "admin";

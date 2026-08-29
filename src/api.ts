@@ -1,5 +1,5 @@
 import { getStoredToken } from "./auth";
-import type { Post } from "./types";
+import type { HomeSettings, Post } from "./types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -65,4 +65,20 @@ export async function deletePostFromApi(id: string) {
       headers: { Accept: "application/json", ...authHeaders() },
     }),
   );
+}
+
+export async function fetchHomeSettingsFromApi() {
+  const data = await readJson<{ settings: HomeSettings | null }>(await fetch(apiUrl("/api/home-settings"), { headers: { Accept: "application/json" } }));
+  return data.settings;
+}
+
+export async function saveHomeSettingsToApi(settings: HomeSettings) {
+  const data = await readJson<{ settings: HomeSettings }>(
+    await fetch(apiUrl("/api/home-settings"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
+      body: JSON.stringify(settings),
+    }),
+  );
+  return data.settings;
 }

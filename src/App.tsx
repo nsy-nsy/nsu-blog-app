@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createPostFromApi, deletePostFromApi, fetchPostsFromApi, hasRemoteApi, updatePostFromApi } from "./api";
+import { createPostFromApi, deletePostFromApi, fetchHomeSettingsFromApi, fetchPostsFromApi, hasRemoteApi, saveHomeSettingsToApi, updatePostFromApi } from "./api";
 import { clearAuth, fetchCurrentUser, hasStoredToken, login, type AuthUser } from "./auth";
 import { AuthStatusCard } from "./components/AuthStatusCard";
 import { Footer } from "./components/Footer";
 import { Header } from "./components/Header";
-import { categories, emptyDraft, STORAGE_KEY } from "./config";
+import { categories, defaultHomeSettings, emptyDraft, HOME_SETTINGS_STORAGE_KEY, STORAGE_KEY } from "./config";
+import { AdminPage } from "./pages/AdminPage";
 import { DetailPage } from "./pages/DetailPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -12,7 +13,7 @@ import { PostsPage } from "./pages/PostsPage";
 import { WritePage } from "./pages/WritePage";
 import { starterPosts } from "./posts";
 import { cleanText, makeId, safeRead, safeWrite } from "./security";
-import type { Category, Page, Post, PostDraft, Theme } from "./types";
+import type { Category, HomeFeature, HomeSectionId, HomeSettings, Page, Post, PostDraft, Theme } from "./types";
 import { estimateReadMinutes, parseTags } from "./utils/blog";
 import { pagePath, routeToState, updateBrowserUrl } from "./utils/routing";
 import { updatePageSeo } from "./utils/seo";
@@ -20,6 +21,7 @@ import { getSystemTheme } from "./utils/theme";
 
 const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 올바르지 않습니다.";
 const BODY_MAX_LENGTH = 30_000;
+const HOME_SECTION_IDS: HomeSectionId[] = ["hero", "features", "latest"];
 
 function normalizePostCategory(post: Post): Post {
   const category = post.category as string;
@@ -35,9 +37,24 @@ function normalizePostCategory(post: Post): Post {
   return post;
 }
 
+function mergeHomeSettings(value: HomeSettings): HomeSettings {
+  const sectionOrder = value.sectionOrder?.filter((sectionId): sectionId is HomeSectionId => HOME_SECTION_IDS.includes(sectionId)) ?? [];
+  const nextOrder = [...sectionOrder, ...HOME_SECTION_IDS.filter((sectionId) => !sectionOrder.includes(sectionId))];
+  const featureMap = new Map<string, HomeFeature>((value.features ?? []).map((feature) => [feature.id, feature]));
+
+  return {
+    ...defaultHomeSettings,
+    ...value,
+    latestCount: Math.min(12, Math.max(1, Number(value.latestCount) || defaultHomeSettings.latestCount)),
+    features: defaultHomeSettings.features.map((feature) => ({ ...feature, ...featureMap.get(feature.id) })),
+    sectionOrder: nextOrder,
+  };
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => getSystemTheme());
   const [posts, setPosts] = useState<Post[]>(() => safeRead<Post[]>(STORAGE_KEY, starterPosts).map(normalizePostCategory));
+  const [homeSettings, setHomeSettings] = useState<HomeSettings>(() => mergeHomeSettings(safeRead<HomeSettings>(HOME_SETTINGS_STORAGE_KEY, defaultHomeSettings)));
   const initialRoute = routeToState(posts);
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -58,7 +75,7 @@ export default function App() {
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
   const filteredPosts = useMemo(() => filterPosts(posts, activeCategory, query), [activeCategory, posts, query]);
-  const featuredPosts = posts.slice(0, 5);
+  const featuredPosts = posts;
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -75,6 +92,18 @@ export default function App() {
       })
       .catch(() => {
         setMessage("백엔드 글 목록을 불러오지 못해 브라우저 저장 글을 표시합니다.");
+      });
+
+    fetchHomeSettingsFromApi()
+      .then((settings) => {
+        if (settings) {
+          const nextSettings = mergeHomeSettings(settings);
+          setHomeSettings(nextSettings);
+          safeWrite(HOME_SETTINGS_STORAGE_KEY, nextSettings);
+        }
+      })
+      .catch(() => {
+        setMessage("백엔드 메인 설정을 불러오지 못해 브라우저 저장 설정을 표시합니다.");
       });
   }, []);
 
@@ -116,8 +145,8 @@ export default function App() {
       return;
     }
 
-    if (page === "write" && !isLoggedIn) {
-      setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
+    if ((page === "write" || page === "admin") && !isLoggedIn) {
+      setLoginMessage(page === "admin" ? "관리 페이지는 로그인 후 사용할 수 있습니다." : "글쓰기는 로그인 후 사용할 수 있습니다.");
       setPage("login");
     }
   }, [authChecking, isLoggedIn, page]);
@@ -132,13 +161,13 @@ export default function App() {
       return;
     }
 
-    if (nextPage === "write" && !isLoggedIn) {
+    if ((nextPage === "write" || nextPage === "admin") && !isLoggedIn) {
       if (authChecking) {
-        moveToPage("write", "/write");
+        moveToPage(nextPage, pagePath(nextPage, selectedPost));
         return;
       }
 
-      setLoginMessage("글쓰기는 로그인 후 사용할 수 있습니다.");
+      setLoginMessage(nextPage === "admin" ? "관리 페이지는 로그인 후 사용할 수 있습니다." : "글쓰기는 로그인 후 사용할 수 있습니다.");
       moveToPage("login", "/login");
       return;
     }
@@ -169,6 +198,37 @@ export default function App() {
   function persistLocal(nextPosts: Post[]) {
     setPosts(nextPosts);
     safeWrite(STORAGE_KEY, nextPosts);
+  }
+
+  function handleHomeSettingsChange(nextSettings: HomeSettings) {
+    setHomeSettings(mergeHomeSettings(nextSettings));
+    setMessage("아직 저장되지 않은 변경사항이 있습니다.");
+  }
+
+  async function handleSaveHomeSettings() {
+    const nextSettings = mergeHomeSettings(homeSettings);
+    if (hasRemoteApi()) {
+      try {
+        const savedSettings = mergeHomeSettings(await saveHomeSettingsToApi(nextSettings));
+        setHomeSettings(savedSettings);
+        safeWrite(HOME_SETTINGS_STORAGE_KEY, savedSettings);
+        setMessage("메인페이지 설정이 DB에 저장되었습니다.");
+        return;
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "메인페이지 설정 저장에 실패했습니다.");
+        return;
+      }
+    }
+
+    setHomeSettings(nextSettings);
+    safeWrite(HOME_SETTINGS_STORAGE_KEY, nextSettings);
+    setMessage("메인페이지 설정이 저장되었습니다.");
+  }
+
+  function handleResetHomeSettings() {
+    setHomeSettings(defaultHomeSettings);
+    safeWrite(HOME_SETTINGS_STORAGE_KEY, defaultHomeSettings);
+    setMessage("메인페이지 설정을 기본값으로 되돌렸습니다.");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -349,7 +409,7 @@ export default function App() {
         theme={theme}
       />
 
-      {page === "home" && <HomePage onNavigate={navigate} onOpenPost={openPost} posts={featuredPosts} />}
+      {page === "home" && <HomePage homeSettings={homeSettings} onNavigate={navigate} onOpenPost={openPost} posts={featuredPosts} />}
       {page === "posts" && (
         <PostsPage
           activeCategory={activeCategory}
@@ -385,6 +445,16 @@ export default function App() {
           setTagInput={setTagInput}
           submitLabel={editingPostId ? "수정 저장" : "글 저장"}
           tagInput={tagInput}
+        />
+      )}
+      {page === "admin" && authChecking && <AuthStatusCard message="관리 권한을 확인 중입니다." />}
+      {page === "admin" && isLoggedIn && (
+        <AdminPage
+          homeSettings={homeSettings}
+          message={message}
+          onHomeSettingsChange={handleHomeSettingsChange}
+          onResetHomeSettings={handleResetHomeSettings}
+          onSaveHomeSettings={handleSaveHomeSettings}
         />
       )}
 
