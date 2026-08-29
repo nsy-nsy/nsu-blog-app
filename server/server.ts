@@ -7,6 +7,7 @@ import { getAdminAuth, saveAdminAuth, type PasswordHash } from "./auth-store.ts"
 import { apiConfig } from "./config.ts";
 import { pingDatabase } from "./db.ts";
 import { createPost, deletePost, getPost, listPosts, updatePost, type BlogPost } from "./posts-store.ts";
+import { getSetting, saveSetting } from "./settings-store.ts";
 
 type TokenPayload = {
   sub: string;
@@ -22,6 +23,7 @@ const invalidLoginMessage = "아이디나 비밀번호가 올바르지 않습니
 const bodyMaxBytes = 80 * 1024 * 1024;
 const validCategories = new Set(["리뷰", "여행", "일상", "컴퓨터"]);
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const homeSettingsKey = "home";
 
 class ApiError extends Error {
   status: number;
@@ -206,6 +208,36 @@ function parsePost(body: Record<string, unknown>, existing?: BlogPost): BlogPost
   };
 }
 
+function parseHomeSettings(body: Record<string, unknown>) {
+  const sectionOrder = parseStringArray(body.sectionOrder, 3, 16).filter((sectionId) => ["hero", "features", "latest"].includes(sectionId));
+  const features = Array.isArray(body.features)
+    ? body.features.slice(0, 3).map((item, index) => {
+        const feature = item as Record<string, unknown>;
+        return {
+          id: cleanText(feature.id, 40) || `feature-${index + 1}`,
+          title: cleanText(feature.title, 40),
+          body: cleanText(feature.body, 160),
+          visible: Boolean(feature.visible),
+        };
+      })
+    : [];
+
+  return {
+    eyebrow: cleanText(body.eyebrow, 80),
+    title: cleanText(body.title, 80),
+    description: cleanText(body.description, 280),
+    primaryButtonLabel: cleanText(body.primaryButtonLabel, 24),
+    secondaryButtonLabel: cleanText(body.secondaryButtonLabel, 24),
+    heroImage: cleanText(body.heroImage, 20_000_000),
+    heroImageAlt: cleanText(body.heroImageAlt, 80),
+    features,
+    latestEyebrow: cleanText(body.latestEyebrow, 40),
+    latestTitle: cleanText(body.latestTitle, 40),
+    latestCount: Math.min(12, Math.max(1, Number(body.latestCount) || 5)),
+    sectionOrder,
+  };
+}
+
 function requireAdmin(request: IncomingMessage) {
   return verifyToken(getBearerToken(request));
 }
@@ -294,6 +326,23 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/posts") {
       sendJson(request, response, 200, { posts: await listPosts() });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/home-settings") {
+      sendJson(request, response, 200, { settings: await getSetting(homeSettingsKey, null) });
+      return;
+    }
+
+    if (request.method === "PUT" && url.pathname === "/api/home-settings") {
+      if (!requireAdmin(request)) {
+        sendJson(request, response, 401, { message: "Unauthorized" });
+        return;
+      }
+
+      const settings = parseHomeSettings(await readBody(request));
+      await saveSetting(homeSettingsKey, settings);
+      sendJson(request, response, 200, { settings });
       return;
     }
 

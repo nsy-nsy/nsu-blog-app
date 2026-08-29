@@ -48,6 +48,13 @@ try {
       INDEX idx_posts_category (category)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      setting_key VARCHAR(80) NOT NULL PRIMARY KEY,
+      value_json JSON NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
   const [rows] = await connection.query("SELECT COUNT(*) AS count FROM posts");
   const [{ count }] = rows as Array<{ count: number }>;
