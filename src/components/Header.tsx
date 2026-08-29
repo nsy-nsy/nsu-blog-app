@@ -1,4 +1,4 @@
-import { Home, List, LogIn, LogOut, Menu, Moon, PenLine, Sun, X } from "lucide-react";
+import { Home, LayoutDashboard, List, LogIn, LogOut, Menu, Moon, PenLine, Sun, X } from "lucide-react";
 import type { AuthUser } from "../auth";
 import type { Page, Theme } from "../types";
 
@@ -19,6 +19,7 @@ export function Header({ authUser, isLoggedIn, menuOpen, onLogout, onNavigate, o
     { page: "home", label: "메인페이지", icon: Home },
     { page: "posts", label: "글목록", icon: List },
     { page: isLoggedIn ? "write" : "login", label: "글쓰기", icon: PenLine },
+    ...(isLoggedIn ? [{ page: "admin" as Page, label: "관리", icon: LayoutDashboard }] : []),
   ];
 
   return (
