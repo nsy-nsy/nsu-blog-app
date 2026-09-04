@@ -40,7 +40,7 @@ writeFileSync(
 
 writeFileSync(
   resolve(publicDir, "robots.txt"),
-  `User-agent: *\nAllow: /\nDisallow: ${basePath}/login\nDisallow: ${basePath}/write\nSitemap: ${absolute("/sitemap.xml")}\n`,
+  `User-agent: *\nAllow: /\nDisallow: ${basePath}/login\nDisallow: ${basePath}/write\nDisallow: ${basePath}/admin\nSitemap: ${absolute("/sitemap.xml")}\n`,
   "utf8",
 );
 
