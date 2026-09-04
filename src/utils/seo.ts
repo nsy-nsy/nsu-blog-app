@@ -22,7 +22,9 @@ export function updatePageSeo(page: Page, selectedPost?: Post) {
         ? "글목록 | 세웅이만의 블로그"
         : page === "admin"
           ? "관리 | 세웅이만의 블로그"
-        : "세웅이만의 블로그";
+          : page === "notFound"
+            ? "페이지를 찾을 수 없습니다 | 세웅이만의 블로그"
+            : "세웅이만의 블로그";
   const description =
     selectedPost && page === "detail"
       ? selectedPost.excerpt
@@ -30,10 +32,12 @@ export function updatePageSeo(page: Page, selectedPost?: Post) {
         ? "신발 리뷰, 일상 기록, 생활 정보, 컴퓨터 팁을 모아둔 글목록입니다."
         : page === "admin"
           ? "메인페이지 설정을 관리하는 관리자 페이지입니다."
-        : "세웅의 신발 리뷰와 일상 기록, 생활 정보, 컴퓨터 팁을 차분하게 남기는 개인 블로그입니다.";
-  const path = pagePath(page, selectedPost);
+          : page === "notFound"
+            ? "주소가 바뀌었거나 현재 블로그에서 제공하지 않는 페이지입니다."
+            : "세웅의 신발 리뷰와 일상 기록, 생활 정보, 컴퓨터 팁을 차분하게 남기는 개인 블로그입니다.";
+  const path = page === "notFound" ? "/" : pagePath(page, selectedPost);
   const url = `${SITE_URL}${path}`;
-  const robots = page === "login" || page === "write" || page === "admin" ? "noindex, nofollow" : "index, follow, max-image-preview:large";
+  const robots = page === "login" || page === "write" || page === "admin" || page === "notFound" ? "noindex, nofollow" : "index, follow, max-image-preview:large";
 
   document.title = title;
   setMeta('meta[name="description"]', description);
