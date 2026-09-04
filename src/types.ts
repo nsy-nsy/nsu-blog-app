@@ -48,4 +48,4 @@ export type HomeSettings = {
   sectionOrder: HomeSectionId[];
 };
 
-export type Page = "home" | "posts" | "detail" | "write" | "login" | "admin";
+export type Page = "home" | "posts" | "detail" | "write" | "login" | "admin" | "notFound";

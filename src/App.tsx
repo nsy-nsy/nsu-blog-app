@@ -9,6 +9,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { DetailPage } from "./pages/DetailPage";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { PostsPage } from "./pages/PostsPage";
 import { WritePage } from "./pages/WritePage";
 import { starterPosts } from "./posts";
@@ -422,6 +423,7 @@ export default function App() {
         />
       )}
       {page === "detail" && <DetailPage isLoggedIn={isLoggedIn} onBack={() => navigate("posts")} onDelete={handleDelete} onEdit={handleEdit} post={selectedPost} />}
+      {page === "notFound" && <NotFoundPage onNavigate={navigate} />}
       {page === "login" && authChecking && <AuthStatusCard message="로그인 상태를 확인 중입니다." />}
       {page === "login" && !authChecking && !isLoggedIn && (
         <LoginPage
