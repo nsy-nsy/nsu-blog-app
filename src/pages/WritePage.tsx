@@ -6,7 +6,10 @@ import type { Category, PostDraft, PostMedia } from "../types";
 const BODY_MAX_LENGTH = 30_000;
 const MAX_IMAGE_FILES = 50;
 const MAX_VIDEO_FILES = 30;
-const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_SOURCE_BYTES = 40 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+const IMAGE_MAX_EDGE = 1600;
+const IMAGE_WEBP_QUALITY = 0.82;
 
 type WritePageProps = {
   categories: Category[];
@@ -19,20 +22,75 @@ type WritePageProps = {
   tagInput: string;
 };
 
-function fileToMedia(file: File): Promise<PostMedia> {
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      resolve({
-        id: `${Date.now().toString(36)}-${crypto.randomUUID()}`,
-        type: file.type.startsWith("video/") ? "video" : "image",
-        src: String(reader.result),
-        name: file.name,
-      });
-    };
+    reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error("파일을 읽을 수 없습니다."));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+function imageToWebp(file: File): Promise<{ src: string; name: string }> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("이미지를 변환할 수 없습니다."));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+      canvas.toBlob(
+        async (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) {
+            reject(new Error("이미지를 WebP로 변환할 수 없습니다."));
+            return;
+          }
+
+          const src = await blobToDataUrl(blob);
+          const name = `${file.name.replace(/\.[^.]+$/, "") || "image"}.webp`;
+          resolve({ src, name });
+        },
+        "image/webp",
+        IMAGE_WEBP_QUALITY,
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("이미지를 읽을 수 없습니다."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function fileToMedia(file: File): Promise<PostMedia> {
+  const id = `${Date.now().toString(36)}-${crypto.randomUUID()}`;
+
+  if (file.type.startsWith("image/")) {
+    const image = await imageToWebp(file);
+    return { id, type: "image", src: image.src, name: image.name };
+  }
+
+  return {
+    id,
+    type: "video",
+    src: await blobToDataUrl(file),
+    name: file.name,
+  };
 }
 
 export function WritePage({ categories, draft, message, onDraftChange, onSubmit, setTagInput, submitLabel = "글 저장", tagInput }: WritePageProps) {
@@ -108,7 +166,12 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
     let skippedBySize = 0;
 
     selected.forEach((file) => {
-      if (file.size > MAX_MEDIA_BYTES) {
+      if (file.type.startsWith("image/") && file.size > MAX_IMAGE_SOURCE_BYTES) {
+        skippedBySize += 1;
+        return;
+      }
+
+      if (file.type.startsWith("video/") && file.size > MAX_VIDEO_BYTES) {
         skippedBySize += 1;
         return;
       }
@@ -134,13 +197,18 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
     });
 
     if (accepted.length === 0) {
-      setMediaMessage(skippedBySize > 0 ? "파일당 최대 25MB까지 추가할 수 있습니다." : `사진은 최대 ${MAX_IMAGE_FILES}개, 동영상은 최대 ${MAX_VIDEO_FILES}개까지 추가할 수 있습니다.`);
+      setMediaMessage(skippedBySize > 0 ? "사진 원본은 파일당 40MB, 동영상은 파일당 25MB까지 추가할 수 있습니다." : `사진은 최대 ${MAX_IMAGE_FILES}개, 동영상은 최대 ${MAX_VIDEO_FILES}개까지 추가할 수 있습니다.`);
       return;
     }
 
-    const nextMedia = await Promise.all(accepted.map(fileToMedia));
-    onDraftChange({ ...draft, media: [...media, ...nextMedia] });
-    setMediaMessage(skippedByCount > 0 || skippedBySize > 0 ? "일부 파일은 개수 또는 용량 제한 때문에 제외되었습니다." : "");
+    setMediaMessage("파일을 가볍게 변환하는 중입니다.");
+    try {
+      const nextMedia = await Promise.all(accepted.map(fileToMedia));
+      onDraftChange({ ...draft, media: [...media, ...nextMedia] });
+      setMediaMessage(skippedByCount > 0 || skippedBySize > 0 ? "일부 파일은 개수 또는 용량 제한 때문에 제외되었습니다. 사진은 WebP로 변환되었습니다." : "사진은 WebP로 변환되어 추가되었습니다.");
+    } catch {
+      setMediaMessage("일부 파일을 변환하지 못했습니다. 다른 파일로 다시 시도해주세요.");
+    }
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -315,9 +383,12 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
               </button>
             </div>
           </div>
+          <p className="text-xs font-bold leading-6 text-zinc-500 dark:text-zinc-400">
+            사진은 자동으로 WebP로 압축됩니다. 동영상은 WebM 또는 압축된 MP4를 올리면 가장 빠르게 로드됩니다.
+          </p>
 
           <input ref={imageInputRef} className="hidden" type="file" accept="image/*" multiple onChange={handleInputChange} />
-          <input ref={videoInputRef} className="hidden" type="file" accept="video/*" multiple onChange={handleInputChange} />
+          <input ref={videoInputRef} className="hidden" type="file" accept="video/webm,video/mp4,video/*" multiple onChange={handleInputChange} />
 
           {media.length > 0 && (
             <div className="grid grid-cols-12 gap-3">
