@@ -154,18 +154,34 @@ function parseStringArray(value: unknown, maxItems: number, maxLength: number) {
 
 function parseMedia(value: unknown) {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      const media = item as Record<string, unknown>;
-      const type = media.type === "video" ? "video" : "image";
-      const src = cleanText(media.src, 20_000_000);
-      const name = cleanText(media.name, 160);
-      const id = cleanText(media.id, 160);
-      const validSrc = src.startsWith("data:image/") || src.startsWith("data:video/") || src.startsWith("posts/") || src.startsWith("https://");
-      return id && validSrc ? { id, type, src, name: name || id } : null;
-    })
-    .filter((item): item is NonNullable<ReturnType<typeof parseMedia>[number]> => Boolean(item))
-    .slice(0, 12);
+  const parsed: Array<{ id: string; type: "image" | "video"; src: string; name: string }> = [];
+  let imageCount = 0;
+  let videoCount = 0;
+
+  value.forEach((item) => {
+    const media = item as Record<string, unknown>;
+    const type = media.type === "video" ? "video" : "image";
+
+    if (type === "image" && imageCount >= 50) return;
+    if (type === "video" && videoCount >= 30) return;
+
+    const src = cleanText(media.src, 20_000_000);
+    const name = cleanText(media.name, 160);
+    const id = cleanText(media.id, 160);
+    const validSrc = src.startsWith("data:image/") || src.startsWith("data:video/") || src.startsWith("posts/") || src.startsWith("https://");
+
+    if (!id || !validSrc) return;
+
+    if (type === "video") {
+      videoCount += 1;
+    } else {
+      imageCount += 1;
+    }
+
+    parsed.push({ id, type, src, name: name || id });
+  });
+
+  return parsed;
 }
 
 function slugify(value: string) {
