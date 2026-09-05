@@ -4,7 +4,8 @@ import { FormInput } from "../components/FormInput";
 import type { Category, PostDraft, PostMedia } from "../types";
 
 const BODY_MAX_LENGTH = 30_000;
-const MAX_MEDIA_FILES = 12;
+const MAX_IMAGE_FILES = 50;
+const MAX_VIDEO_FILES = 30;
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 type WritePageProps = {
@@ -41,6 +42,8 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [mediaMessage, setMediaMessage] = useState("");
   const media = draft.media ?? [];
+  const imageCount = media.filter((item) => item.type === "image").length;
+  const videoCount = media.filter((item) => item.type === "video").length;
 
   function updateBody(body: string) {
     onDraftChange({ ...draft, body });
@@ -92,21 +95,52 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
       return;
     }
 
-    const slots = MAX_MEDIA_FILES - media.length;
-    if (slots <= 0) {
-      setMediaMessage(`미디어는 최대 ${MAX_MEDIA_FILES}개까지 추가할 수 있습니다.`);
+    let remainingImages = MAX_IMAGE_FILES - imageCount;
+    let remainingVideos = MAX_VIDEO_FILES - videoCount;
+
+    if (remainingImages <= 0 && remainingVideos <= 0) {
+      setMediaMessage(`사진은 최대 ${MAX_IMAGE_FILES}개, 동영상은 최대 ${MAX_VIDEO_FILES}개까지 추가할 수 있습니다.`);
       return;
     }
 
-    const accepted = selected.slice(0, slots).filter((file) => file.size <= MAX_MEDIA_BYTES);
+    const accepted: File[] = [];
+    let skippedByCount = 0;
+    let skippedBySize = 0;
+
+    selected.forEach((file) => {
+      if (file.size > MAX_MEDIA_BYTES) {
+        skippedBySize += 1;
+        return;
+      }
+
+      if (file.type.startsWith("video/")) {
+        if (remainingVideos <= 0) {
+          skippedByCount += 1;
+          return;
+        }
+
+        remainingVideos -= 1;
+        accepted.push(file);
+        return;
+      }
+
+      if (remainingImages <= 0) {
+        skippedByCount += 1;
+        return;
+      }
+
+      remainingImages -= 1;
+      accepted.push(file);
+    });
+
     if (accepted.length === 0) {
-      setMediaMessage("파일당 최대 25MB까지 추가할 수 있습니다.");
+      setMediaMessage(skippedBySize > 0 ? "파일당 최대 25MB까지 추가할 수 있습니다." : `사진은 최대 ${MAX_IMAGE_FILES}개, 동영상은 최대 ${MAX_VIDEO_FILES}개까지 추가할 수 있습니다.`);
       return;
     }
 
     const nextMedia = await Promise.all(accepted.map(fileToMedia));
     onDraftChange({ ...draft, media: [...media, ...nextMedia] });
-    setMediaMessage(selected.length > accepted.length ? "일부 파일은 개수 또는 용량 제한 때문에 제외되었습니다." : "");
+    setMediaMessage(skippedByCount > 0 || skippedBySize > 0 ? "일부 파일은 개수 또는 용량 제한 때문에 제외되었습니다." : "");
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
@@ -264,6 +298,9 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
             <div className="inline-flex items-center gap-2 text-sm font-black">
               <Upload size={18} />
               미디어
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                사진 {imageCount}/{MAX_IMAGE_FILES} · 동영상 {videoCount}/{MAX_VIDEO_FILES}
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-black dark:border-zinc-700 dark:bg-zinc-950" type="button" onClick={() => imageInputRef.current?.click()}>
