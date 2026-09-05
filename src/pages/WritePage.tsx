@@ -394,7 +394,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
             <div className="grid grid-cols-12 gap-3">
               {media.map((item) => (
                 <figure key={item.id} className="col-span-12 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 sm:col-span-6">
-                  {item.type === "image" ? <img className="aspect-video w-full object-cover" src={item.src} alt={item.name} /> : <video className="aspect-video w-full object-cover" src={item.src} controls />}
+                  {item.type === "image" ? <img className="aspect-video w-full object-cover" src={item.src} alt={item.name} loading="lazy" /> : <video className="aspect-video w-full object-cover" src={item.src} controls preload="metadata" />}
                   <figcaption className="flex items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">
                     <span className="truncate">{item.name}</span>
                     <span className="inline-flex items-center gap-1">
