@@ -12,6 +12,10 @@ const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const IMAGE_MAX_EDGE = 1600;
 const IMAGE_WEBP_QUALITY = 0.82;
 
+function isImageFile(file: File) {
+  return file.type.toLowerCase().startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name);
+}
+
 type WritePageProps = {
   categories: Category[];
   draft: PostDraft;
@@ -34,10 +38,10 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-function imageToWebp(file: File): Promise<{ src: string; name: string }> {
+async function imageToWebp(file: File): Promise<{ src: string; name: string }> {
+  const source = await blobToDataUrl(file);
   return new Promise((resolve, reject) => {
     const image = new Image();
-    const objectUrl = URL.createObjectURL(file);
 
     image.onload = () => {
       const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
@@ -47,9 +51,8 @@ function imageToWebp(file: File): Promise<{ src: string; name: string }> {
       canvas.width = width;
       canvas.height = height;
 
-      const context = canvas.getContext("2d", { alpha: false });
+      const context = canvas.getContext("2d");
       if (!context) {
-        URL.revokeObjectURL(objectUrl);
         reject(new Error("이미지를 변환할 수 없습니다."));
         return;
       }
@@ -57,15 +60,18 @@ function imageToWebp(file: File): Promise<{ src: string; name: string }> {
       context.drawImage(image, 0, 0, width, height);
       canvas.toBlob(
         async (blob) => {
-          URL.revokeObjectURL(objectUrl);
-          if (!blob) {
+          if (!blob || blob.type !== "image/webp") {
             reject(new Error("이미지를 WebP로 변환할 수 없습니다."));
             return;
           }
 
-          const src = await blobToDataUrl(blob);
-          const name = `${file.name.replace(/\.[^.]+$/, "") || "image"}.webp`;
-          resolve({ src, name });
+          try {
+            const src = await blobToDataUrl(blob);
+            const name = `${file.name.replace(/\.[^.]+$/, "") || "image"}.webp`;
+            resolve({ src, name });
+          } catch (error) {
+            reject(error);
+          }
         },
         "image/webp",
         IMAGE_WEBP_QUALITY,
@@ -73,17 +79,16 @@ function imageToWebp(file: File): Promise<{ src: string; name: string }> {
     };
 
     image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
       reject(new Error("이미지를 읽을 수 없습니다."));
     };
-    image.src = objectUrl;
+    image.src = source;
   });
 }
 
 async function fileToMedia(file: File): Promise<PostMedia> {
   const id = `${Date.now().toString(36)}-${crypto.randomUUID()}`;
 
-  if (file.type.startsWith("image/")) {
+  if (isImageFile(file)) {
     const image = await imageToWebp(file);
     return { id, type: "image", src: image.src, name: image.name };
   }
@@ -104,6 +109,10 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
   const lastSyncedBodyRef = useRef("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [mediaMessage, setMediaMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const uploadLock = useRef(false);
+  const latestDraft = useRef(draft);
+  latestDraft.current = draft;
   const media = draft.media ?? [];
   const imageCount = media.filter((item) => item.type === "image").length;
   const videoCount = media.filter((item) => item.type === "video").length;
@@ -195,7 +204,8 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
   }
 
   async function addFiles(files: FileList | File[]) {
-    const selected = Array.from(files).filter((file) => file.type.startsWith("image/") || file.type.startsWith("video/"));
+    if (uploadLock.current) return;
+    const selected = Array.from(files).filter((file) => isImageFile(file) || file.type.startsWith("video/"));
     if (selected.length === 0) {
       setMediaMessage("이미지 또는 동영상 파일만 추가할 수 있습니다.");
       return;
@@ -214,7 +224,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
     let skippedBySize = 0;
 
     selected.forEach((file) => {
-      if (file.type.startsWith("image/") && file.size > MAX_IMAGE_SOURCE_BYTES) {
+      if (isImageFile(file) && file.size > MAX_IMAGE_SOURCE_BYTES) {
         skippedBySize += 1;
         return;
       }
@@ -250,12 +260,26 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
     }
 
     setMediaMessage("파일을 가볍게 변환하는 중입니다.");
+    uploadLock.current = true;
+    setUploading(true);
     try {
-      const nextMedia = await Promise.all(accepted.map(fileToMedia));
-      onDraftChange({ ...draft, media: [...media, ...nextMedia] });
-      setMediaMessage(skippedByCount > 0 || skippedBySize > 0 ? "일부 파일은 개수 또는 용량 제한 때문에 제외되었습니다. 사진은 WebP로 변환되었습니다." : "사진은 WebP로 변환되어 추가되었습니다.");
+      const nextMedia: PostMedia[] = [];
+      const failed: string[] = [];
+      for (const file of accepted) {
+        try {
+          nextMedia.push(await fileToMedia(file));
+        } catch {
+          failed.push(file.name);
+        }
+      }
+      const current = latestDraft.current;
+      onDraftChange({ ...current, media: [...(current.media ?? []), ...nextMedia] });
+      setMediaMessage(`${nextMedia.length}개 추가되었습니다. 사진은 WebP로 저장됩니다.${failed.length ? ` 변환 실패: ${failed.join(", ")}` : ""}${skippedByCount || skippedBySize ? " 일부 파일은 개수 또는 용량 제한으로 제외되었습니다." : ""}`);
     } catch {
       setMediaMessage("일부 파일을 변환하지 못했습니다. 다른 파일로 다시 시도해주세요.");
+    } finally {
+      uploadLock.current = false;
+      setUploading(false);
     }
   }
 
@@ -416,7 +440,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
             사진은 자동으로 WebP로 압축됩니다. 동영상은 WebM 또는 압축된 MP4를 올리면 가장 빠르게 로드됩니다.
           </p>
 
-          <input ref={imageInputRef} className="hidden" type="file" accept="image/*" multiple onChange={handleInputChange} />
+          <input ref={imageInputRef} className="hidden" type="file" accept="image/*,.png,.PNG,.jpg,.JPG,.jpeg,.JPEG,.webp" multiple disabled={uploading} onChange={handleInputChange} />
           <input ref={videoInputRef} className="hidden" type="file" accept="video/webm,video/mp4,video/*" multiple onChange={handleInputChange} />
 
           {media.length > 0 && (
@@ -449,7 +473,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
             <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-5 py-3 font-black text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" type="button" onClick={onSaveDraft} disabled={saving}>
               <Save size={17} /> 임시저장
             </button>
-            <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-zinc-950" type="submit" disabled={saving || bodyLength > BODY_MAX_LENGTH}>
+            <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-zinc-950" type="submit" disabled={saving || uploading || bodyLength > BODY_MAX_LENGTH}>
               {saving ? "저장 중..." : submitLabel}
             </button>
           </div>
