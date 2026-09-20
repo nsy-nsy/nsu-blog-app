@@ -19,10 +19,12 @@ export function safeRead<T>(key: string, fallback: T): T {
   }
 }
 
-export function safeWrite<T>(key: string, value: T): void {
+export function safeWrite<T>(key: string, value: T): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
     // Storage can be unavailable in private browsing or locked-down environments.
+    return false;
   }
 }

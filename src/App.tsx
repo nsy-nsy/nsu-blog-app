@@ -16,12 +16,14 @@ import { starterPosts } from "./posts";
 import { cleanText, makeId, safeRead, safeWrite } from "./security";
 import type { Category, HomeFeature, HomeSectionId, HomeSettings, Page, Post, PostDraft, Theme } from "./types";
 import { estimateReadMinutes, parseTags } from "./utils/blog";
+import { deleteSavedDraft, readLocalPosts, readSavedDraft, writeLocalPosts, writeSavedDraft } from "./utils/localDatabase";
+import { richTextLength } from "./utils/richText";
 import { pagePath, routeToState, updateBrowserUrl } from "./utils/routing";
 import { updatePageSeo } from "./utils/seo";
 import { getSystemTheme } from "./utils/theme";
 
 const INVALID_LOGIN_MESSAGE = "아이디나 비밀번호가 올바르지 않습니다.";
-const BODY_MAX_LENGTH = 30_000;
+const BODY_MAX_LENGTH = 120_000;
 const HOME_SECTION_IDS: HomeSectionId[] = ["hero", "features", "latest"];
 
 function normalizePostCategory(post: Post): Post {
@@ -73,6 +75,7 @@ export default function App() {
   const [loginPasscode, setLoginPasscode] = useState("");
   const [loginMessage, setLoginMessage] = useState("");
   const [loginPending, setLoginPending] = useState(false);
+  const [postSaving, setPostSaving] = useState(false);
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
   const filteredPosts = useMemo(() => filterPosts(posts, activeCategory, query), [activeCategory, posts, query]);
@@ -107,6 +110,27 @@ export default function App() {
         setMessage("백엔드 메인 설정을 불러오지 못해 브라우저 저장 설정을 표시합니다.");
       });
   }, []);
+
+  useEffect(() => {
+    if (hasRemoteApi()) return;
+    readLocalPosts()
+      .then((savedPosts) => {
+        if (savedPosts?.length) setPosts(savedPosts.map(normalizePostCategory));
+      })
+      .catch(() => setMessage("브라우저에 저장된 글을 불러오지 못했습니다."));
+  }, []);
+
+  useEffect(() => {
+    if (page !== "write" || !isLoggedIn || editingPostId || draft.title || draft.excerpt || richTextLength(draft.body) > 0) return;
+    readSavedDraft()
+      .then((saved) => {
+        if (!saved) return;
+        setDraft(saved.draft);
+        setTagInput(saved.tagInput);
+        setMessage(`${new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(saved.savedAt))} 임시저장을 불러왔습니다.`);
+      })
+      .catch(() => setMessage("임시저장을 불러오지 못했습니다."));
+  }, [draft.body, draft.excerpt, draft.title, editingPostId, isLoggedIn, page]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -196,9 +220,31 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function persistLocal(nextPosts: Post[]) {
+  async function persistLocal(nextPosts: Post[]) {
     setPosts(nextPosts);
-    safeWrite(STORAGE_KEY, nextPosts);
+    const savedToLegacyStorage = safeWrite(STORAGE_KEY, nextPosts);
+    try {
+      await writeLocalPosts(nextPosts);
+    } catch (error) {
+      if (!savedToLegacyStorage) throw error;
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (!draft.title && !draft.excerpt && richTextLength(draft.body) === 0 && (draft.media?.length ?? 0) === 0) {
+      setMessage("임시저장할 내용을 먼저 작성해주세요.");
+      return;
+    }
+
+    setPostSaving(true);
+    try {
+      await writeSavedDraft({ draft, tagInput, savedAt: new Date().toISOString() });
+      setMessage("임시저장했습니다. 다음에 글쓰기 화면을 열면 자동으로 불러옵니다.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "임시저장에 실패했습니다.");
+    } finally {
+      setPostSaving(false);
+    }
   }
 
   function handleHomeSettingsChange(nextSettings: HomeSettings) {
@@ -251,10 +297,18 @@ export default function App() {
       tags: parseTags(tagInput),
     };
 
-    if (!nextDraft.title || !nextDraft.excerpt || nextDraft.body.length < 120) {
+    const bodyTextLength = richTextLength(nextDraft.body);
+    if (!nextDraft.title || !nextDraft.excerpt || bodyTextLength < 120) {
       setMessage("제목, 요약, 본문 120자 이상을 채워주세요.");
       return;
     }
+    if (bodyTextLength > 30_000) {
+      setMessage("본문은 최대 30,000자까지 저장할 수 있습니다.");
+      return;
+    }
+
+    setPostSaving(true);
+    try {
 
     if (editingPostId) {
       const existingPost = posts.find((post) => post.id === editingPostId);
@@ -279,7 +333,7 @@ export default function App() {
       }
 
       const nextPosts = posts.map((post) => (post.id === editingPostId ? savedPost : post));
-      persistLocal(nextPosts);
+      await persistLocal(nextPosts);
       setDraft(emptyDraft);
       setTagInput("");
       setEditingPostId(null);
@@ -306,12 +360,18 @@ export default function App() {
       }
     }
 
-    persistLocal([post, ...posts].slice(0, 80));
+    await persistLocal([post, ...posts].slice(0, 80));
+    await deleteSavedDraft().catch(() => undefined);
     setDraft(emptyDraft);
     setTagInput("");
     setSelectedId(post.id);
-    setMessage("글이 저장되었습니다.");
-    navigate("detail");
+    setMessage(hasRemoteApi() ? "글이 저장되었습니다." : "글이 이 브라우저에 저장되었습니다.");
+    moveToPage("detail", pagePath("detail", post));
+    } catch (error) {
+      setMessage(error instanceof Error ? `저장하지 못했습니다: ${error.message}` : "글 저장에 실패했습니다.");
+    } finally {
+      setPostSaving(false);
+    }
   }
 
   async function handleDelete(id: string) {
@@ -327,7 +387,7 @@ export default function App() {
     }
 
     const nextPosts = posts.filter((post) => post.id !== id);
-    persistLocal(nextPosts);
+    await persistLocal(nextPosts);
     setSelectedId(nextPosts[0]?.id ?? "");
   }
 
@@ -443,7 +503,9 @@ export default function App() {
           draft={draft}
           message={message}
           onDraftChange={setDraft}
+          onSaveDraft={handleSaveDraft}
           onSubmit={handleSubmit}
+          saving={postSaving}
           setTagInput={setTagInput}
           submitLabel={editingPostId ? "수정 저장" : "글 저장"}
           tagInput={tagInput}

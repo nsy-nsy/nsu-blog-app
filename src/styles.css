@@ -86,6 +86,148 @@ textarea {
   color: #6ee7b7;
 }
 
+.editor-divider {
+  width: 1px;
+  height: 1.5rem;
+  margin: 0 0.25rem;
+  background: #e4e4e7;
+}
+
+.dark .editor-divider {
+  background: #3f3f46;
+}
+
+.rich-editor:empty::before {
+  color: #a1a1aa;
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.rich-editor p,
+.rich-content p {
+  margin: 0 0 1.25rem;
+  min-height: 1.75rem;
+}
+
+.rich-editor h2,
+.rich-content h2 {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.rich-editor h3,
+.rich-content h3 {
+  margin: 1.5rem 0 0.625rem;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.rich-editor blockquote,
+.rich-content blockquote {
+  margin: 1.5rem 0;
+  border-left: 4px solid #10b981;
+  background: #ecfdf5;
+  padding: 1rem 1.25rem;
+  color: #3f3f46;
+}
+
+.dark .rich-editor blockquote,
+.dark .rich-content blockquote {
+  background: rgb(6 78 59 / 28%);
+  color: #e4e4e7;
+}
+
+.rich-editor ul,
+.rich-editor ol,
+.rich-content ul,
+.rich-content ol {
+  margin: 1rem 0 1.25rem;
+  padding-left: 1.5rem;
+}
+
+.rich-editor ul,
+.rich-content ul {
+  list-style: disc;
+}
+
+.rich-editor ol,
+.rich-content ol {
+  list-style: decimal;
+}
+
+.rich-editor a,
+.rich-content a {
+  color: #047857;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dark .rich-editor a,
+.dark .rich-content a {
+  color: #6ee7b7;
+}
+
+.rich-editor hr,
+.rich-content hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid #d4d4d8;
+}
+
+.dark .rich-editor hr,
+.dark .rich-content hr {
+  border-color: #3f3f46;
+}
+
+.editor-media {
+  margin: 1.5rem 0;
+  overflow: hidden;
+  border: 1px solid #d4d4d8;
+  border-radius: 0.5rem;
+  background: #fafafa;
+  user-select: none;
+}
+
+.dark .editor-media {
+  border-color: #3f3f46;
+  background: #09090b;
+}
+
+.editor-media img,
+.editor-media video {
+  display: block;
+  width: 100%;
+  max-height: 28rem;
+  background: #000;
+  object-fit: contain;
+}
+
+.editor-media figcaption {
+  overflow: hidden;
+  padding: 0.625rem 0.875rem;
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .rich-editor h2,
+  .rich-content h2 {
+    font-size: 1.45rem;
+  }
+
+  .rich-editor h3,
+  .rich-content h3 {
+    font-size: 1.15rem;
+  }
+}
+
 .admin-input {
   width: 100%;
   border-radius: 0.75rem;
