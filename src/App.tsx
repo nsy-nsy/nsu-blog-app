@@ -76,6 +76,13 @@ export default function App() {
   const [loginMessage, setLoginMessage] = useState("");
   const [loginPending, setLoginPending] = useState(false);
   const [postSaving, setPostSaving] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<{ title: string; detail: string } | null>(null);
+
+  useEffect(() => {
+    if (!saveNotice) return;
+    const timer = window.setTimeout(() => setSaveNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [saveNotice]);
 
   const selectedPost = posts.find((post) => post.id === selectedId) ?? posts[0];
   const filteredPosts = useMemo(() => filterPosts(posts, activeCategory, query), [activeCategory, posts, query]);
@@ -239,6 +246,7 @@ export default function App() {
     setPostSaving(true);
     try {
       await writeSavedDraft({ draft, tagInput, savedAt: new Date().toISOString() });
+      setSaveNotice({ title: "임시저장이 완료되었습니다.", detail: "이 브라우저에 저장되었습니다." });
       setMessage("임시저장했습니다. 다음에 글쓰기 화면을 열면 자동으로 불러옵니다.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "임시저장에 실패했습니다.");
@@ -339,6 +347,7 @@ export default function App() {
       setEditingPostId(null);
       setSelectedId(savedPost.id);
       setMessage("글이 수정되었습니다.");
+      setSaveNotice({ title: "글 수정이 완료되었습니다.", detail: hasRemoteApi() ? "저장된 내용을 확인하세요." : "이 브라우저에만 저장되었습니다. 서버 게시가 아닙니다." });
       moveToPage("detail", pagePath("detail", savedPost));
       return;
     }
@@ -366,6 +375,7 @@ export default function App() {
     setTagInput("");
     setSelectedId(post.id);
     setMessage(hasRemoteApi() ? "글이 저장되었습니다." : "글이 이 브라우저에 저장되었습니다.");
+    setSaveNotice({ title: "글쓰기가 완료되었습니다.", detail: hasRemoteApi() ? "저장된 글을 확인하세요." : "이 브라우저에만 저장되었습니다. 서버 게시가 아닙니다." });
     moveToPage("detail", pagePath("detail", post));
     } catch (error) {
       setMessage(error instanceof Error ? `저장하지 못했습니다: ${error.message}` : "글 저장에 실패했습니다.");
@@ -458,6 +468,15 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-zinc-950 transition-colors dark:bg-[#050505] dark:text-zinc-50">
+      {saveNotice && (
+        <div className="fixed inset-x-4 top-4 z-[100] mx-auto flex max-w-md items-center gap-4 rounded-lg border border-emerald-600 bg-white p-4 text-zinc-950 shadow-lg dark:bg-zinc-900 dark:text-zinc-50">
+          <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1 break-words">
+            <p className="text-sm font-semibold">{saveNotice.title}</p>
+            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">{saveNotice.detail}</p>
+          </div>
+          <button type="button" onClick={() => setSaveNotice(null)} className="shrink-0 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">확인</button>
+        </div>
+      )}
       <Header
         authUser={authUser}
         isLoggedIn={isLoggedIn}
