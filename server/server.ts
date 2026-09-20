@@ -200,7 +200,7 @@ function parsePost(body: Record<string, unknown>, existing?: BlogPost): BlogPost
   const title = cleanText(body.title, 90);
   const category = cleanText(body.category, 24);
   const excerpt = cleanText(body.excerpt, 220);
-  const content = cleanText(body.body, 30_000);
+  const content = cleanText(body.body, 120_000);
   const tags = parseStringArray(body.tags, 12, 32);
   const media = parseMedia(body.media);
   const images = parseStringArray(body.images, 40, 1000);
