@@ -1,11 +1,12 @@
 import { cleanText } from "../security";
+import { richTextLength } from "./richText";
 
 export function formatDate(value: string) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
 }
 
 export function estimateReadMinutes(body: string) {
-  return Math.max(1, Math.ceil(body.replace(/\s+/g, "").length / 650));
+  return Math.max(1, Math.ceil(richTextLength(body) / 650));
 }
 
 export function parseTags(value: string) {
