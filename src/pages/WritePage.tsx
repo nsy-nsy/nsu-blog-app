@@ -355,7 +355,7 @@ export function WritePage({ categories, draft, message, onDraftChange, onSaveDra
             </span>
           </div>
           <div className="overflow-hidden rounded-xl border border-zinc-300 bg-white focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/15 dark:border-zinc-700 dark:bg-zinc-900">
-            <div className="sticky top-20 z-10 flex flex-wrap items-center gap-1 border-b border-zinc-200 bg-white/95 p-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+            <div role="group" aria-label="본문 서식 도구" className="flex flex-wrap items-center gap-1 border-b border-zinc-200 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-950">
               <button className="editor-tool px-3" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("formatBlock", "p")} title="본문으로 바꾸기">
                 본문
               </button>
