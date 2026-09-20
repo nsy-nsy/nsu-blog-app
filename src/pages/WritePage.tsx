@@ -1,7 +1,8 @@
-import { type ChangeEvent, type DragEvent, type FormEvent, useRef, useState } from "react";
-import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronDown, Heading1, Heading2, ImageIcon, Italic, Link, List, ListOrdered, Minus, Plus, Quote, Strikethrough, Trash2, Type, Underline, Upload, Video } from "lucide-react";
+import { type ChangeEvent, type DragEvent, type FormEvent, type MouseEvent, useEffect, useRef, useState } from "react";
+import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronDown, Heading2, Heading3, ImageIcon, Italic, Link, List, ListOrdered, Minus, Plus, Quote, Save, Strikethrough, Trash2, Underline, Upload, Video } from "lucide-react";
 import { FormInput } from "../components/FormInput";
 import type { Category, PostDraft, PostMedia } from "../types";
+import { richHtmlForEditor, richTextLength, serializeEditorHtml } from "../utils/richText";
 
 const BODY_MAX_LENGTH = 30_000;
 const MAX_IMAGE_FILES = 50;
@@ -16,7 +17,9 @@ type WritePageProps = {
   draft: PostDraft;
   message: string;
   onDraftChange: (draft: PostDraft) => void;
+  onSaveDraft: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  saving: boolean;
   setTagInput: (tags: string) => void;
   submitLabel?: string;
   tagInput: string;
@@ -93,56 +96,101 @@ async function fileToMedia(file: File): Promise<PostMedia> {
   };
 }
 
-export function WritePage({ categories, draft, message, onDraftChange, onSubmit, setTagInput, submitLabel = "글 저장", tagInput }: WritePageProps) {
+export function WritePage({ categories, draft, message, onDraftChange, onSaveDraft, onSubmit, saving, setTagInput, submitLabel = "글 저장", tagInput }: WritePageProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const lastSyncedBodyRef = useRef("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [mediaMessage, setMediaMessage] = useState("");
   const media = draft.media ?? [];
   const imageCount = media.filter((item) => item.type === "image").length;
   const videoCount = media.filter((item) => item.type === "video").length;
+  const bodyLength = richTextLength(draft.body);
 
-  function updateBody(body: string) {
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || draft.body === lastSyncedBodyRef.current) return;
+    editor.innerHTML = richHtmlForEditor(draft.body, media);
+    lastSyncedBodyRef.current = draft.body;
+  }, [draft.body, media]);
+
+  function updateBodyFromEditor() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const body = serializeEditorHtml(editor);
+    lastSyncedBodyRef.current = body;
     onDraftChange({ ...draft, body });
   }
 
-  function insertAtCursor(value: string) {
-    const textarea = bodyRef.current;
-    const start = textarea?.selectionStart ?? draft.body.length;
-    const end = textarea?.selectionEnd ?? draft.body.length;
-    const nextBody = `${draft.body.slice(0, start)}${value}${draft.body.slice(end)}`;
-    updateBody(nextBody);
-
-    window.requestAnimationFrame(() => {
-      textarea?.focus();
-      const cursor = start + value.length;
-      textarea?.setSelectionRange(cursor, cursor);
-    });
+  function rememberSelection() {
+    const selection = window.getSelection();
+    const editor = editorRef.current;
+    if (!selection?.rangeCount || !editor?.contains(selection.anchorNode)) return;
+    savedRangeRef.current = selection.getRangeAt(0).cloneRange();
   }
 
-  function wrapSelection(before: string, after = before, fallback = "텍스트") {
-    const textarea = bodyRef.current;
-    const start = textarea?.selectionStart ?? draft.body.length;
-    const end = textarea?.selectionEnd ?? draft.body.length;
-    const selected = draft.body.slice(start, end) || fallback;
-    const nextValue = `${before}${selected}${after}`;
-    const nextBody = `${draft.body.slice(0, start)}${nextValue}${draft.body.slice(end)}`;
-    updateBody(nextBody);
-
-    window.requestAnimationFrame(() => {
-      textarea?.focus();
-      textarea?.setSelectionRange(start + before.length, start + before.length + selected.length);
-    });
+  function restoreSelection() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    if (savedRangeRef.current && editor.contains(savedRangeRef.current.commonAncestorContainer)) {
+      selection?.addRange(savedRangeRef.current);
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection?.addRange(range);
   }
 
-  function insertLine(prefix: string, fallback = "내용을 입력하세요") {
-    const needsBreak = draft.body && !draft.body.endsWith("\n") ? "\n" : "";
-    insertAtCursor(`${needsBreak}${prefix}${fallback}\n`);
+  function runCommand(command: string, value?: string) {
+    restoreSelection();
+    document.execCommand(command, false, value);
+    rememberSelection();
+    updateBodyFromEditor();
+  }
+
+  function handleToolMouseDown(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+  }
+
+  function addLink() {
+    const href = window.prompt("연결할 주소를 입력하세요.", "https://");
+    if (!href) return;
+    runCommand("createLink", href);
   }
 
   function insertMediaIntoBody(item: PostMedia) {
-    insertAtCursor(`\n\n[[media:${item.id}]]\n\n`);
+    const editor = editorRef.current;
+    if (!editor) return;
+    restoreSelection();
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = richHtmlForEditor(`[[media:${item.id}]]`, [item]);
+    const fragment = document.createDocumentFragment();
+    let lastNode: ChildNode | null = null;
+    while (wrapper.firstChild) {
+      lastNode = fragment.appendChild(wrapper.firstChild);
+    }
+    if (range) {
+      range.deleteContents();
+      range.insertNode(fragment);
+      if (lastNode) {
+        range.setStartAfter(lastNode);
+        range.collapse(true);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+    } else {
+      editor.appendChild(fragment);
+    }
+    rememberSelection();
+    updateBodyFromEditor();
     setMediaMessage(`${item.name}을 본문 위치에 넣었습니다.`);
   }
 
@@ -223,7 +271,9 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
   }
 
   function removeMedia(id: string) {
+    editorRef.current?.querySelector(`[data-media-id="${CSS.escape(id)}"]`)?.remove();
     onDraftChange({ ...draft, media: media.filter((item) => item.id !== id) });
+    window.requestAnimationFrame(updateBodyFromEditor);
   }
 
   return (
@@ -273,84 +323,63 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
         </div>
         <FormInput label="요약" maxLength={220} onChange={(value) => onDraftChange({ ...draft, excerpt: value })} placeholder="글목록에 보일 짧은 설명" value={draft.excerpt} />
         <FormInput label="태그" maxLength={120} onChange={setTagInput} placeholder="예: ROA, 로아셀라, 리뷰" value={tagInput} />
-        <label className="grid gap-2 font-bold">
-          본문
-          <div className="sticky top-20 z-10 grid gap-2 rounded-xl border border-zinc-200 bg-white/95 p-2 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
-            <div className="flex flex-wrap items-center gap-1">
-              <button className="editor-tool" type="button" onClick={() => insertLine("# ", "큰 제목")} title="큰 제목">
-                <Heading1 size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => insertLine("## ", "소제목")} title="소제목">
-                <Heading2 size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("**", "**")} title="굵게">
-                <Bold size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("*", "*")} title="기울임">
-                <Italic size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("__", "__")} title="밑줄">
-                <Underline size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("~~", "~~")} title="취소선">
-                <Strikethrough size={16} />
-              </button>
-              <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-800" />
-              <button className="editor-tool" type="button" onClick={() => insertLine("> ", "인용문")} title="인용문">
-                <Quote size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => insertLine("- ", "목록")} title="목록">
-                <List size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => insertLine("1. ", "번호 목록")} title="번호 목록">
-                <ListOrdered size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => insertAtCursor("\n---\n")} title="구분선">
-                <Minus size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("[", "](https://)", "링크 텍스트")} title="링크">
-                <Link size={16} />
-              </button>
-              <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-800" />
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("[align=left]\n", "\n[/align]")} title="왼쪽 정렬">
-                <AlignLeft size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("[align=center]\n", "\n[/align]")} title="가운데 정렬">
-                <AlignCenter size={16} />
-              </button>
-              <button className="editor-tool" type="button" onClick={() => wrapSelection("[align=right]\n", "\n[/align]")} title="오른쪽 정렬">
-                <AlignRight size={16} />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900" onChange={(event) => event.target.value && wrapSelection(`[font=${event.target.value}]`, "[/font]")} defaultValue="">
-                <option value="">폰트</option>
-                <option value="sans">기본고딕</option>
-                <option value="serif">명조</option>
-                <option value="mono">코드체</option>
-              </select>
-              <select className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900" onChange={(event) => event.target.value && wrapSelection(`[size=${event.target.value}]`, "[/size]")} defaultValue="">
-                <option value="">글자크기</option>
-                <option value="sm">작게</option>
-                <option value="base">기본</option>
-                <option value="lg">크게</option>
-                <option value="xl">아주 크게</option>
-              </select>
-              <button className="editor-tool px-3" type="button" onClick={() => wrapSelection("[mark]", "[/mark]")} title="강조">
-                <Type size={16} />
-                강조
-              </button>
-            </div>
+        <div className="grid gap-2">
+          <div className="flex items-end justify-between gap-3">
+            <span className="font-bold">본문</span>
+            <span className={`text-xs font-bold ${bodyLength > BODY_MAX_LENGTH ? "text-red-600" : "text-zinc-500 dark:text-zinc-400"}`}>
+              {bodyLength.toLocaleString()} / {BODY_MAX_LENGTH.toLocaleString()}자
+            </span>
           </div>
-          <textarea
-            ref={bodyRef}
-            className="min-h-[34rem] resize-y rounded-xl border border-zinc-300 bg-white px-4 py-3 leading-8 outline-none focus:border-emerald-700 dark:border-zinc-700 dark:bg-zinc-900"
-            value={draft.body}
-            maxLength={BODY_MAX_LENGTH}
-            onChange={(event) => updateBody(event.target.value)}
-            placeholder="본문을 입력하세요."
-          />
-        </label>
+          <div className="overflow-hidden rounded-xl border border-zinc-300 bg-white focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-500/15 dark:border-zinc-700 dark:bg-zinc-900">
+            <div className="sticky top-20 z-10 flex flex-wrap items-center gap-1 border-b border-zinc-200 bg-white/95 p-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+              <button className="editor-tool px-3" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("formatBlock", "p")} title="본문으로 바꾸기">
+                본문
+              </button>
+              <button className="editor-tool px-3" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("formatBlock", "h2")} title="큰 제목으로 바꾸기">
+                <Heading2 size={16} /> 큰 제목
+              </button>
+              <button className="editor-tool px-3" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("formatBlock", "h3")} title="소제목으로 바꾸기">
+                <Heading3 size={16} /> 소제목
+              </button>
+              <span className="editor-divider" />
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("bold")} title="굵게"><Bold size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("italic")} title="기울임"><Italic size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("underline")} title="밑줄"><Underline size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("strikeThrough")} title="취소선"><Strikethrough size={16} /></button>
+              <span className="editor-divider" />
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("formatBlock", "blockquote")} title="인용문"><Quote size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("insertUnorderedList")} title="글머리 목록"><List size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("insertOrderedList")} title="번호 목록"><ListOrdered size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("insertHorizontalRule")} title="구분선"><Minus size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={addLink} title="링크"><Link size={16} /></button>
+              <span className="editor-divider" />
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("justifyLeft")} title="왼쪽 정렬"><AlignLeft size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("justifyCenter")} title="가운데 정렬"><AlignCenter size={16} /></button>
+              <button className="editor-tool" type="button" onMouseDown={handleToolMouseDown} onClick={() => runCommand("justifyRight")} title="오른쪽 정렬"><AlignRight size={16} /></button>
+            </div>
+            <div
+              ref={editorRef}
+              className="rich-editor min-h-[34rem] px-5 py-5 text-base leading-8 outline-none md:px-7 md:py-6"
+              contentEditable
+              role="textbox"
+              aria-label="게시글 본문"
+              aria-multiline="true"
+              data-placeholder="본문을 입력하세요. 제목이나 소제목을 선택하면 작성 화면에서도 실제 크기로 표시됩니다."
+              onBlur={rememberSelection}
+              onInput={() => {
+                rememberSelection();
+                updateBodyFromEditor();
+              }}
+              onKeyUp={rememberSelection}
+              onMouseUp={rememberSelection}
+              onPaste={(event) => {
+                event.preventDefault();
+                document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+              }}
+              suppressContentEditableWarning
+            />
+          </div>
+        </div>
 
         <div
           className="grid gap-4 rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-4 transition dark:border-zinc-700 dark:bg-zinc-900/50"
@@ -416,9 +445,14 @@ export function WritePage({ categories, draft, message, onDraftChange, onSubmit,
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-bold text-zinc-600 dark:text-zinc-400">{message || `본문은 최소 120자 이상, 최대 ${BODY_MAX_LENGTH.toLocaleString()}자까지 작성할 수 있습니다.`}</p>
-          <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white dark:bg-white dark:text-zinc-950" type="submit">
-            {submitLabel}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-5 py-3 font-black text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" type="button" onClick={onSaveDraft} disabled={saving}>
+              <Save size={17} /> 임시저장
+            </button>
+            <button className="rounded-xl bg-zinc-950 px-5 py-3 font-black text-white disabled:cursor-wait disabled:opacity-60 dark:bg-white dark:text-zinc-950" type="submit" disabled={saving || bodyLength > BODY_MAX_LENGTH}>
+              {saving ? "저장 중..." : submitLabel}
+            </button>
+          </div>
         </div>
       </form>
     </section>

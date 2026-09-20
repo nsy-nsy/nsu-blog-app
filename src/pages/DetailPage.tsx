@@ -2,8 +2,9 @@ import { Pencil, Tag, Trash2 } from "lucide-react";
 import { ASSET_BASE } from "../config";
 import type { Post } from "../types";
 import { formatDate } from "../utils/blog";
+import { MEDIA_TOKEN_PATTERN, RICH_TEXT_MARKER, sanitizeRichHtml } from "../utils/richText";
 
-const mediaTokenPattern = /\[\[media:([^\]]+)\]\]/g;
+const mediaTokenPattern = MEDIA_TOKEN_PATTERN;
 
 function resolveMediaSrc(src: string) {
   return src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("http") ? src : `${ASSET_BASE}${src}`;
@@ -93,9 +94,15 @@ function BodyMedia({ post, mediaId, index }: { post: Post; mediaId: string; inde
 
 function RenderBody({ post }: { post: Post }) {
   const segments = post.body.split(mediaTokenPattern);
+  const richText = post.body.startsWith(RICH_TEXT_MARKER);
   return (
-    <div className="mt-10 text-[15.5px] leading-8 text-zinc-850 dark:text-zinc-100 md:text-base">
-      {segments.map((segment, index) => (index % 2 === 1 ? <BodyMedia key={`${segment}-${index}`} post={post} mediaId={segment} index={index} /> : <BodyText key={index} text={segment} />))}
+    <div className="article-body mt-10 text-[15.5px] leading-8 text-zinc-850 dark:text-zinc-100 md:text-base">
+      {segments.map((segment, index) => {
+        if (index % 2 === 1) return <BodyMedia key={`${segment}-${index}`} post={post} mediaId={segment} index={index} />;
+        if (!richText) return <BodyText key={index} text={segment} />;
+        const html = sanitizeRichHtml(index === 0 ? segment.replace(RICH_TEXT_MARKER, "") : segment);
+        return html ? <div key={index} className="rich-content" dangerouslySetInnerHTML={{ __html: html }} /> : null;
+      })}
     </div>
   );
 }
